@@ -130,7 +130,7 @@ function recordAttempt(scope: string, success: boolean) {
   writeAttempts(attempts);
 }
 
-export async function createPinCredential(
+async function createPinCredential(
   scope: string,
   pin: string,
 ): Promise<PinCredential> {
@@ -174,13 +174,13 @@ export async function verifyHostPin(pin: string): Promise<boolean> {
 
 export async function configurePlayerPin(
   playerId: string,
-  credential: PinCredential,
+  pin: string,
 ): Promise<void> {
   const registry = readRegistry();
   if (registry.players[playerId]) {
     throw new Error("Für dieses Profil besteht bereits eine PIN.");
   }
-  registry.players[playerId] = credential;
+  registry.players[playerId] = await createPinCredential(`player:${playerId}`, pin);
   writeRegistry(registry);
 }
 
