@@ -15,34 +15,49 @@ export function getPlayer(state: GameState, playerId: string): PlayerState {
 }
 
 export function getPlayerCapabilities(player: PlayerState): PlayerCapabilities {
+  const registered = player.registrationStatus !== "invited";
   const present = player.attendanceStatus === "present";
   const disqualified = player.winnerPoolStatus === "disqualified";
   const eligible = player.winnerPoolStatus === "eligible";
 
   return {
-    eligibleToWin: eligible && player.attendanceStatus !== "departed",
-    canVote: present && !disqualified,
-    canJoinChallenges: present && !disqualified,
-    canBeMillionaire: present && eligible,
+    eligibleToWin:
+      registered && eligible && player.attendanceStatus !== "departed",
+    canVote: registered && present && !disqualified,
+    canJoinChallenges: registered && present && !disqualified,
+    canBeMillionaire: registered && present && eligible,
   };
 }
 
-export function getEligibleMillionaireCandidates(state: GameState): PlayerState[] {
-  return state.players.filter((player) => getPlayerCapabilities(player).canBeMillionaire);
+export function getEligibleMillionaireCandidates(
+  state: GameState,
+): PlayerState[] {
+  return state.players.filter(
+    (player) => getPlayerCapabilities(player).canBeMillionaire,
+  );
 }
 
 export function getVotingPlayers(state: GameState): PlayerState[] {
-  return state.players.filter((player) => getPlayerCapabilities(player).canVote);
+  return state.players.filter(
+    (player) => getPlayerCapabilities(player).canVote,
+  );
 }
 
 export function getAccusablePlayers(state: GameState): PlayerState[] {
-  return state.players.filter((player) => getPlayerCapabilities(player).canBeMillionaire);
+  return state.players.filter(
+    (player) => getPlayerCapabilities(player).canBeMillionaire,
+  );
 }
 
-export function setMillionaire(state: GameState, playerId: string): GameState {
+export function setMillionaire(
+  state: GameState,
+  playerId: string,
+): GameState {
   const selected = getPlayer(state, playerId);
   if (!getPlayerCapabilities(selected).canBeMillionaire) {
-    throw new Error("Nur ein anwesender und gewinnberechtigter Spieler kann Millionär werden.");
+    throw new Error(
+      "Nur ein registrierter, anwesender und gewinnberechtigter Spieler kann Millionär werden.",
+    );
   }
 
   return {
@@ -54,7 +69,11 @@ export function setMillionaire(state: GameState, playerId: string): GameState {
       if (!capabilities.eligibleToWin) {
         return { ...player, role: "none" };
       }
-      return { ...player, role: player.id === playerId ? "millionaire" : "investigator" };
+      return {
+        ...player,
+        role:
+          player.id === playerId ? "millionaire" : "investigator",
+      };
     }),
   };
 }
@@ -65,7 +84,8 @@ export function applyPlayerLifecycleChange(
 ): LifecycleChangeResult {
   const currentPlayer = getPlayer(state, change.playerId);
   const round = change.effectiveRound ?? state.currentRound;
-  const isCurrentMillionaire = state.millionairePlayerId === change.playerId;
+  const isCurrentMillionaire =
+    state.millionairePlayerId === change.playerId;
   let updatedPlayer: PlayerState = { ...currentPlayer };
 
   switch (change.action) {
@@ -84,7 +104,9 @@ export function applyPlayerLifecycleChange(
         ...updatedPlayer,
         attendanceStatus: "departed",
         winnerPoolStatus:
-          updatedPlayer.winnerPoolStatus === "eligible" ? "eliminated" : updatedPlayer.winnerPoolStatus,
+          updatedPlayer.winnerPoolStatus === "eligible"
+            ? "eliminated"
+            : updatedPlayer.winnerPoolStatus,
         role: "none",
         eliminatedInRound: updatedPlayer.eliminatedInRound ?? round,
         departedInRound: updatedPlayer.departedInRound ?? round,
@@ -94,15 +116,30 @@ export function applyPlayerLifecycleChange(
       break;
     case "pause":
       if (updatedPlayer.attendanceStatus === "departed") {
-        throw new Error("Ein bereits abgereister Spieler kann nur über eine administrative Korrektur zurückkehren.");
+        throw new Error(
+          "Ein bereits abgereister Spieler kann nur über eine administrative Korrektur zurückkehren.",
+        );
       }
-      updatedPlayer = { ...updatedPlayer, attendanceStatus: "temporarily_absent" };
+      updatedPlayer = {
+        ...updatedPlayer,
+        attendanceStatus: "temporarily_absent",
+      };
       break;
     case "return":
       if (updatedPlayer.attendanceStatus !== "temporarily_absent") {
-        throw new Error("Nur ein vorübergehend abwesender Spieler kann regulär zurückkehren.");
+        throw new Error(
+          "Nur ein vorübergehend abwesender Spieler kann regulär zurückkehren.",
+        );
       }
-      updatedPlayer = { ...updatedPlayer, attendanceStatus: "present" };
+      if (updatedPlayer.registrationStatus === "invited") {
+        throw new Error(
+          "Ein eingeladenes Profil muss sich zuerst persönlich registrieren.",
+        );
+      }
+      updatedPlayer = {
+        ...updatedPlayer,
+        attendanceStatus: "present",
+      };
       break;
     case "disqualify":
       updatedPlayer = {
@@ -115,6 +152,11 @@ export function applyPlayerLifecycleChange(
       };
       break;
     case "reinstate":
+      if (updatedPlayer.registrationStatus === "invited") {
+        throw new Error(
+          "Ein eingeladenes Profil kann nicht administrativ aktiviert werden. Die Person muss sich registrieren.",
+        );
+      }
       updatedPlayer = {
         ...updatedPlayer,
         attendanceStatus: "present",
@@ -128,15 +170,19 @@ export function applyPlayerLifecycleChange(
       break;
   }
 
-  const canStillBeMillionaire = getPlayerCapabilities(updatedPlayer).canBeMillionaire;
+  const canStillBeMillionaire =
+    getPlayerCapabilities(updatedPlayer).canBeMillionaire;
   const needsDecision = isCurrentMillionaire && !canStillBeMillionaire;
-  const isTemporaryBlock = isCurrentMillionaire && change.action === "pause";
+  const isTemporaryBlock =
+    isCurrentMillionaire && change.action === "pause";
   const clearMillionaire = needsDecision && change.action !== "pause";
 
   const nextState: GameState = {
     ...state,
     revision: state.revision + 1,
-    millionairePlayerId: clearMillionaire ? undefined : state.millionairePlayerId,
+    millionairePlayerId: clearMillionaire
+      ? undefined
+      : state.millionairePlayerId,
     players: state.players.map((player) =>
       player.id === updatedPlayer.id ? updatedPlayer : player,
     ),
@@ -154,7 +200,9 @@ export function applyPlayerLifecycleChange(
     );
   }
   if (change.action === "depart") {
-    warnings.push("Der Spieler nimmt ab sofort weder an Abstimmungen noch an Challenges teil.");
+    warnings.push(
+      "Der Spieler nimmt ab sofort weder an Abstimmungen noch an Challenges teil.",
+    );
   }
 
   return {
