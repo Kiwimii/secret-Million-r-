@@ -60,8 +60,18 @@ jobs:
       - name: Static browser export
         shell: bash
         run: |
+          set -o pipefail
           rm -rf .next out
           mv proxy.ts proxy.ts.disabled
-          GITHUB_PAGES=true npm run build
+          GITHUB_PAGES=true npm run build 2>&1 | tee static-export-output.txt
           test -f out/index.html
           test -f out/demo/index.html
+
+      - name: Upload static export diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-export-diagnostics
+          path: static-export-output.txt
+          if-no-files-found: ignore
+          retention-days: 3
