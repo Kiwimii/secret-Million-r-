@@ -97,12 +97,20 @@ export default function DemoAppFinalSecure() {
   const roleDecisionCount = getRoleDecisionCount(snapshot);
   const roleDecisionRequired = getRoleDecisionRequired(snapshot);
   const teamCount = snapshot.teamsByRound[round]?.length ?? 0;
+  const registeredPlayers = snapshot.game.players.filter(
+    (player) => player.registrationStatus === "registered",
+  ).length;
+  const invitedPlayers = snapshot.game.players.filter(
+    (player) => player.registrationStatus === "invited",
+  ).length;
   const guide = useMemo(
     () =>
       getHostGuide({
         round,
         phase: snapshot.game.phase,
         hasMillionaire: Boolean(snapshot.game.millionairePlayerId),
+        registeredPlayers,
+        invitedPlayers,
         missionStatus:
           snapshot.missionStatusByRound[round] ?? "unassigned",
         voteStage,
@@ -131,6 +139,8 @@ export default function DemoAppFinalSecure() {
       snapshot.roleTransferResolvedByRound,
       snapshot.challengeIdByRound,
       snapshot.challengeWinnerByRound,
+      registeredPlayers,
+      invitedPlayers,
       roleDecisionCount,
       roleDecisionRequired,
       voteCount,
@@ -401,8 +411,7 @@ export default function DemoAppFinalSecure() {
               return;
             }
             run(
-              () =>
-                actions.submitVote(selectedPlayer.id, voteTargetId),
+              () => actions.submitVote(selectedPlayer.id, voteTargetId),
               "Deine Stimme wurde geheim gespeichert.",
             );
           }}
