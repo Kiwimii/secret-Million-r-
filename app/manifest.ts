@@ -9,13 +9,11 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#050c0e",
     theme_color: "#071113",
-    orientation: "portrait-primary",
     icons: [
       {
         src: "/secret-millionaer-icon.svg",
         sizes: "any",
         type: "image/svg+xml",
-        purpose: "any maskable",
       },
     ],
   };
