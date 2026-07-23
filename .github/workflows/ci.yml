@@ -8,7 +8,7 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,3 +56,12 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Static browser export
+        shell: bash
+        run: |
+          rm -rf .next out
+          mv proxy.ts proxy.ts.disabled
+          GITHUB_PAGES=true npm run build
+          test -f out/index.html
+          test -f out/demo/index.html
