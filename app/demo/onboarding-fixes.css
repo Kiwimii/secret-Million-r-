@@ -1,0 +1,21 @@
+.cinematic-orbit {
+  animation-name: cinematic-orbit-spin;
+}
+
+.cinematic-token::after,
+.role-tutorial-radar,
+.transition-core > i,
+.security-ring::before,
+.security-ring::after {
+  animation-name: cinematic-regular-spin;
+}
+
+@keyframes cinematic-orbit-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes cinematic-regular-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
