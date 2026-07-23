@@ -2,6 +2,10 @@ import { getRoundPhaseSequence } from "./constants";
 import { getPlayer, getPlayerCapabilities } from "./lifecycle";
 import type { GameState, NextGameStep, RoundNumber } from "./types";
 
+export function getNextGameStep(
+  state: GameState & { phase: "finished" },
+): undefined;
+export function getNextGameStep(state: GameState): NextGameStep;
 export function getNextGameStep(state: GameState): NextGameStep | undefined {
   if (state.phase === "finished") return undefined;
   if (state.phase === "lobby") return { round: 1, phase: "role_reveal" };
@@ -26,10 +30,10 @@ export function getNextGameStep(state: GameState): NextGameStep | undefined {
 }
 
 export function canAdvanceGame(state: GameState): { allowed: boolean; reason?: string } {
-  const next = getNextGameStep(state);
-  if (!next) {
+  if (state.phase === "finished") {
     return { allowed: false, reason: "Das Spiel ist bereits beendet." };
   }
+  const next = getNextGameStep(state);
 
   // Die Rollenentscheidungsphase muss auch geöffnet werden können, wenn der
   // bisherige Millionär ausgeschieden ist. Verlassen werden darf sie erst,
@@ -57,7 +61,6 @@ export function advanceGame(state: GameState): GameState {
   if (!validation.allowed) throw new Error(validation.reason);
 
   const next = getNextGameStep(state);
-  if (!next) throw new Error("Kein weiterer Spielschritt vorhanden.");
 
   return {
     ...state,
