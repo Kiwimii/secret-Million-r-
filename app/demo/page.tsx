@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import DemoApp from "./DemoApp";
+import DemoAppFinal from "./DemoAppFinal";
 
 export const metadata: Metadata = {
-  title: "Mobile Testversion | Secret Millionär",
-  description: "Interaktive Browser-Testversion des Secret-Millionär-Spiels für Smartphone und Desktop.",
+  title: "Einsatztest | Secret Millionär",
+  description:
+    "Geführte, mobile Browser-Testversion des vollständigen Secret-Millionär-Spiels.",
 };
 
 export default function DemoPage() {
-  return <DemoApp />;
+  return <DemoAppFinal />;
 }

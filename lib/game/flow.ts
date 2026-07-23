@@ -1,4 +1,4 @@
-import { ROUND_PHASES } from "./constants";
+import { getRoundPhaseSequence } from "./constants";
 import { getPlayer, getPlayerCapabilities } from "./lifecycle";
 import type { GameState, NextGameStep, RoundNumber } from "./types";
 
@@ -19,8 +19,9 @@ export function getNextGameStep(state: GameState): NextGameStep | undefined {
     };
   }
 
-  const currentIndex = ROUND_PHASES.indexOf(state.phase);
-  const nextPhase = ROUND_PHASES[currentIndex + 1];
+  const phases = getRoundPhaseSequence(state.currentRound);
+  const currentIndex = phases.indexOf(state.phase);
+  const nextPhase = phases[currentIndex + 1];
   return nextPhase ? { round: state.currentRound, phase: nextPhase } : undefined;
 }
 
@@ -32,7 +33,7 @@ export function canAdvanceGame(state: GameState): { allowed: boolean; reason?: s
 
   // Die Rollenentscheidungsphase muss auch geöffnet werden können, wenn der
   // bisherige Millionär ausgeschieden ist. Verlassen werden darf sie erst,
-  // nachdem die Spielleitung einen gültigen Nachfolger festgelegt hat.
+  // nachdem serverseitig ein gültiger Nachfolger ausgelost wurde.
   const nextNeedsMillionaire = !["finished", "role_transfer"].includes(next.phase);
   if (nextNeedsMillionaire && !state.millionairePlayerId) {
     return { allowed: false, reason: "Es ist kein aktiver Millionär festgelegt." };
