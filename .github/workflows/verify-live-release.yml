@@ -1,5 +1,5 @@
 name: Verify live release
-# This workflow intentionally verifies the public page and live Supabase RPCs.
+# Verifies public Pages, anonymous Supabase Auth and the deployed live-game RPC.
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
-      - name: Wait for live database RPCs
+      - name: Verify anonymous Auth and live database RPC
         id: backend
         continue-on-error: true
         shell: bash
@@ -87,22 +87,24 @@ jobs:
               { auth: { persistSession: false, autoRefreshToken: false } },
             );
             const auth = await client.auth.signInAnonymously();
-            if (auth.error) throw auth.error;
+            if (auth.error || !auth.data.user) {
+              throw auth.error ?? new Error('Anonyme Authentifizierung lieferte keinen Benutzer.');
+            }
 
             let lastError;
             for (let attempt = 1; attempt <= 36; attempt += 1) {
               const result = await client.rpc('lookup_live_game', {
                 raw_join_code: '999999',
               });
-              if (!result.error) {
-                console.log('Live RPC und anonyme Authentifizierung sind erreichbar.');
+              if (!result.error && Array.isArray(result.data)) {
+                console.log('Anonymous Auth und lookup_live_game sind erreichbar.');
                 return;
               }
               lastError = result.error;
-              console.log(`Backend noch nicht bereit (${attempt}/36): ${result.error.message}`);
+              console.log(`Backend noch nicht bereit (${attempt}/36): ${result.error?.message ?? 'unerwartete Antwort'}`);
               await sleep(10_000);
             }
-            throw lastError ?? new Error('Live RPC blieb unerreichbar.');
+            throw lastError ?? new Error('Live-RPC blieb unerreichbar.');
           }
 
           verify().catch((error) => {
@@ -111,7 +113,7 @@ jobs:
           });
           NODE
 
-      - name: Wait for public game page
+      - name: Verify public game page
         id: page
         continue-on-error: true
         shell: bash
@@ -137,6 +139,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
           verified_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           overall="erfolgreich"
           if [[ "$CONFIG_OUTCOME" != "success" || "$BACKEND_OUTCOME" != "success" || "$PAGE_OUTCOME" != "success" ]]; then
@@ -154,12 +160,13 @@ jobs:
             echo "- GitHub Pages HTTP-Prüfung: $PAGE_OUTCOME"
           } > docs/LIVE_RELEASE_STATUS.md
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
           git add docs/LIVE_RELEASE_STATUS.md
-          git commit -m "[skip ci] Record live Secret Millionär release status"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "Live-Release-Status ist unverändert."
+          else
+            git commit -m "[skip ci] Record live Secret Millionär release status"
+            git push origin main
+          fi
 
       - name: Fail unsuccessful release verification
         if: always() && (steps.config.outcome != 'success' || steps.backend.outcome != 'success' || steps.page.outcome != 'success')
