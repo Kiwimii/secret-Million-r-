@@ -18,6 +18,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,10 +33,61 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate live backend configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "SUPABASE_ACCESS_TOKEN fehlt"; exit 1; }
+          test -n "$SUPABASE_PROJECT_ID" || { echo "SUPABASE_PROJECT_ID fehlt"; exit 1; }
+
+      - name: Enable anonymous device sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error \
+            --output auth-config-response.json \
+            --write-out "%{http_code}" \
+            --request PATCH \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"external_anonymous_users_enabled":true}' \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/auth")
+          if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+            cat auth-config-response.json
+            echo "Anonymous Sign-ins konnten nicht aktiviert werden (HTTP $status)."
+            exit 1
+          fi
+
+      - name: Resolve public Supabase browser key
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output supabase-api-keys.json
+
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('supabase-api-keys.json', 'utf8'));
+          const selected = keys.find((key) => key.type === 'publishable')
+            ?? keys.find((key) => key.name === 'anon');
+          if (!selected?.api_key) {
+            console.error('Kein publishable/anon API-Key im Supabase-Projekt gefunden.');
+            process.exit(1);
+          }
+          process.stdout.write(selected.api_key);
+          NODE
+          )
+
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
       - name: Prepare static export
         run: mv proxy.ts proxy.ts.disabled
 
-      - name: Build static browser version
+      - name: Build static live browser version
         env:
           GITHUB_PAGES: "true"
         run: npm run build
