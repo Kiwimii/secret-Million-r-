@@ -23,10 +23,15 @@ export function getPublicSupabaseConfig(): PublicSupabaseConfig {
   return { url, publishableKey };
 }
 
-export function getSupabaseServiceRoleKey(): string {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY fehlt auf dem Server.");
+export function getSupabaseSecretKey(): string {
+  const secretKey =
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!secretKey) {
+    throw new Error(
+      "SUPABASE_SECRET_KEY fehlt auf dem Server. Der alte SUPABASE_SERVICE_ROLE_KEY wird nur noch als Übergang unterstützt.",
+    );
   }
-  return serviceRoleKey;
+
+  return secretKey;
 }
