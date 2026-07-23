@@ -1,0 +1,57 @@
+name: Patch live hook refs
+
+on:
+  push:
+    branches: [feat/live-game-instances]
+    paths:
+      - ".github/workflows/patch-live-hook.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/live-game-instances
+      - name: Apply focused TypeScript fixes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('lib/live/useLiveGame.ts')
+          text = path.read_text()
+          replacements = {
+              'const clientRef = useRef<SupabaseClient>();': 'const clientRef = useRef<SupabaseClient | null>(null);',
+              'const channelRef = useRef<RealtimeChannel>();': 'const channelRef = useRef<RealtimeChannel | null>(null);',
+              'const identityRef = useRef<LiveSessionIdentity>();': 'const identityRef = useRef<LiveSessionIdentity | undefined>(undefined);',
+              'setPrivateState((privateRows[0] ?? undefined) as LivePrivateState | undefined);': 'setPrivateState((privateRows[0] ?? undefined) as unknown as LivePrivateState | undefined);',
+              '''      if (channelRef.current === channelRef.current) {
+                void channelRef.current?.untrack();
+                void client.removeChannel(channelRef.current as RealtimeChannel);
+                channelRef.current = undefined;
+              }''': '''      const activeChannel = channelRef.current;
+              if (activeChannel) {
+                void activeChannel.untrack();
+                void client.removeChannel(activeChannel);
+                if (channelRef.current === activeChannel) channelRef.current = null;
+              }''',
+              'channelRef.current = undefined;': 'channelRef.current = null;',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Muster nicht gefunden: {old[:80]}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/live/useLiveGame.ts
+          git commit -m "fix: make live realtime refs strict-mode safe"
+          git push origin HEAD:feat/live-game-instances
