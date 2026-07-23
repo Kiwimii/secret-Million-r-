@@ -43,14 +43,18 @@ export default function LobbyOverview({
       </div>
 
       <div className="lobby-player-grid">
+        {snapshot.game.players.length === 0 && (
+          <div className="lobby-empty-state">
+            Noch niemand ist registriert. Das erste persönliche Profil erscheint
+            hier unmittelbar nach der PIN-geschützten Anmeldung.
+          </div>
+        )}
         {snapshot.game.players.map((player) => {
           const team = getTeamForPlayer(assignments, player.id);
           const isCurrent = player.id === currentPlayerId;
           return (
             <article
-              className={`lobby-player-card ${isCurrent ? "current" : ""} ${
-                player.registrationStatus === "invited" ? "invited" : ""
-              }`}
+              className={`lobby-player-card ${isCurrent ? "current" : ""}`}
               key={player.id}
             >
               <div className="lobby-avatar-wrap">
