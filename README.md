@@ -2,6 +2,23 @@
 
 Mobile, moderierte Echtzeit-Web-App für das Secret-Millionär-Wochenende.
 
+## Browser-Testversion
+
+Die Route `/demo` enthält eine mobile-first Testumgebung für Smartphone und Desktop:
+
+- Spielleiter- und Spieleransicht
+- Rollenkarte mit diskreter Aufdeckung
+- Mission und Vorteil für den Millionär
+- geheime Abstimmung
+- Spielerstatus für Ausscheiden, Abreise, Pause und Disqualifikation
+- Runden- und Phasensteuerung
+- simulierte Auswertung und Punktevergabe
+- Speicherung im Browser
+- Synchronisierung zwischen mehreren Tabs desselben Browsers
+- installierbares Web-App-Manifest
+
+Die Testversion benötigt keine Supabase-Schlüssel und kann sofort bereitgestellt werden. Getrennte Smartphones werden in diesem Zwischenstand noch nicht miteinander synchronisiert. Das folgt mit der produktiven Supabase-Anbindung.
+
 ## Aktueller Stand
 
 Der aktuelle Entwicklungsstand enthält:
@@ -19,19 +36,6 @@ Der aktuelle Entwicklungsstand enthält:
 - gehärtetes Supabase-Datenmodell für Rollen, Missionen, Stimmen, Punkte und Ereignisprotokoll
 - Unit-Tests und GitHub-Actions-CI
 
-## Entwicklungsmodus
-
-Das Dashboard unter `/admin` ist bereits bedienbar. Seine Änderungen werden aktuell nur im Browserzustand gehalten. Es ist deshalb noch nicht für das echte Wochenende oder mehrere Geräte geeignet.
-
-Der produktive Mehrgerätebetrieb benötigt ein verbundenes Supabase-Projekt für:
-
-- dauerhaften Spielstand
-- Spieler- und Spielleiteranmeldung
-- Profilfoto-Upload
-- geheime persönliche Ansichten
-- Live-Synchronisierung
-- serverseitige, verbindliche Auswertung
-
 ## Lokaler Start
 
 ```bash
@@ -40,7 +44,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Danach läuft die Anwendung unter `http://localhost:3000`.
+Danach läuft die Anwendung unter `http://localhost:3000`. Die mobile Testversion liegt unter `http://localhost:3000/demo`.
 
 ## Qualitätsprüfung
 
@@ -54,10 +58,12 @@ npm run build
 ## Projektstruktur
 
 - `app/` – Next.js-Oberflächen
+- `app/demo/` – mobile Browser-Testversion
+- `lib/demo/` – lokaler Testspielstand und Browser-Synchronisierung
 - `lib/game/` – deterministische Spielregeln und Kataloge
 - `supabase/migrations/` – Datenbankschema und Zugriffsschutz
 - `docs/ARCHITECTURE.md` – Architektur- und Sicherheitsentscheidungen
 
 ## Nächster Meilenstein
 
-Supabase-Projekt verbinden, anonyme Spieleridentitäten und Spielleiter-Login einrichten, Beitritte dauerhaft speichern und Dashboard sowie Spieleransichten live synchronisieren.
+Vercel-Bereitstellung der Browser-Testversion. Danach werden anonyme Spieleridentitäten, Spielleiter-Login, dauerhafte Speicherung und Live-Synchronisierung über das bereits angelegte Supabase-Projekt verbunden.
