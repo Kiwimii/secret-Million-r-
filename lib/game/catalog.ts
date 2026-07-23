@@ -1,4 +1,8 @@
-import type { MissionDefinition } from "./types";
+import type { AdvantageDefinition, MissionDefinition } from "./types";
+import {
+  ADVANTAGES as BASE_ADVANTAGES,
+  getAdvantageById,
+} from "./advantages";
 
 export const MISSIONS: readonly MissionDefinition[] = [
   {
@@ -71,4 +75,11 @@ export const MISSIONS: readonly MissionDefinition[] = [
   },
 ] as const;
 
-export { ADVANTAGES, getAdvantageById } from "./advantages";
+// Die bekannten festen Rundenkarten behalten ihre Herkunftsrunde, sind in der
+// digitalen Spielleitung aber bewusst als Alternativauswahl in jeder Runde
+// verfügbar. Dadurch stehen exakt acht bekannte und acht neue Karten zur Wahl.
+export const ADVANTAGES: readonly AdvantageDefinition[] = BASE_ADVANTAGES.map(
+  (advantage) => ({ ...advantage, reserve: true }),
+);
+
+export { getAdvantageById };
