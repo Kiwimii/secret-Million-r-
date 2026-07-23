@@ -1,4 +1,4 @@
-import type { AdvantageDefinition, MissionDefinition } from "./types";
+import type { MissionDefinition } from "./types";
 
 export const MISSIONS: readonly MissionDefinition[] = [
   {
@@ -71,73 +71,4 @@ export const MISSIONS: readonly MissionDefinition[] = [
   },
 ] as const;
 
-export const ADVANTAGES: readonly AdvantageDefinition[] = [
-  {
-    id: "r1-double-vote",
-    round: 1,
-    reserve: false,
-    title: "Doppelte Stimme",
-    effect: "double_vote",
-    description: "Der persönliche Abstimmungszettel des Millionärs zählt zweimal.",
-    limit: "Vor Einwurf ankündigen. Nur Hauptabstimmung, nicht erneut in der Stichwahl.",
-  },
-  {
-    id: "r2-block-vote",
-    round: 2,
-    reserve: false,
-    title: "Stimmensperre",
-    effect: "block_vote",
-    description: "Die persönliche Stimme eines vorher bestimmten anderen Spielers wird ignoriert.",
-    limit: "Vor Einsammlung bestimmen. Nur Hauptabstimmung.",
-  },
-  {
-    id: "r3-two-shadow-votes",
-    round: 3,
-    reserve: false,
-    title: "Zwei Schattenstimmen",
-    effect: "add_two_votes",
-    description: "Ein vorher genannter gewinnberechtigter Spieler erhält nach der regulären Zählung zwei zusätzliche Stimmen.",
-    limit: "Das Ziel darf der Millionär selbst sein. Nur Hauptabstimmung.",
-  },
-  {
-    id: "r4-redirect",
-    round: 4,
-    reserve: false,
-    title: "Umleitung",
-    effect: "redirect_one_vote",
-    description: "Eine reguläre Stimme gegen den Millionär wird gestrichen und einem anderen gewinnberechtigten Ziel zugerechnet.",
-    limit: "Verfällt ohne Stimme gegen den Millionär. Nur Hauptabstimmung.",
-  },
-  {
-    id: "reserve-one-shadow-vote",
-    reserve: true,
-    title: "Eine Schattenstimme",
-    effect: "add_one_vote",
-    description: "Ein vorab genanntes Ziel erhält nach der regulären Zählung eine zusätzliche Stimme.",
-    limit: "Nur Hauptabstimmung.",
-  },
-  {
-    id: "reserve-blind-vote",
-    reserve: true,
-    title: "Blinde Stimme",
-    effect: "ignore_eliminated_vote",
-    description: "Die Stimme eines vorab genannten bereits ausgeschiedenen Spielers wird ignoriert.",
-    limit: "Nur Hauptabstimmung.",
-  },
-  {
-    id: "reserve-protect-other",
-    reserve: true,
-    title: "Schutzschild für einen anderen",
-    effect: "protect_other",
-    description: "Eine gegen einen anderen gewinnberechtigten Spieler abgegebene Stimme wird gestrichen.",
-    limit: "Kein Selbstschutz. Nur Hauptabstimmung.",
-  },
-  {
-    id: "reserve-tie-priority",
-    reserve: true,
-    title: "Vorteil im Gleichstand",
-    effect: "tie_priority",
-    description: "Ist der Millionär Teil eines Gleichstands um Platz eins, scheidet der vorher bestimmte andere Gleichstehende aus.",
-    limit: "Einmalig bei der ersten Wertung. Keine erneute Anwendung in der Stichwahl.",
-  },
-] as const;
+export { ADVANTAGES, getAdvantageById } from "./advantages";
