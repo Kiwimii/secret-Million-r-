@@ -121,18 +121,19 @@ jobs:
       - name: Record verified release
         shell: bash
         run: |
+          set -euo pipefail
           verified_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          cat > docs/LIVE_RELEASE_STATUS.md <<EOF
-          # Live-Release verifiziert
-
-          - Status: erfolgreich
-          - Zeitpunkt (UTC): $verified_at
-          - Commit: $GITHUB_SHA
-          - Öffentliche Seite: $LIVE_URL
-          - Supabase Anonymous Auth: erreichbar
-          - Live-RPC `lookup_live_game`: erreichbar
-          - GitHub Pages: HTTP-Erfolg
-          EOF
+          {
+            echo "# Live-Release verifiziert"
+            echo
+            echo "- Status: erfolgreich"
+            echo "- Zeitpunkt (UTC): $verified_at"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Öffentliche Seite: $LIVE_URL"
+            echo "- Supabase Anonymous Auth: erreichbar"
+            echo "- Live-RPC lookup_live_game: erreichbar"
+            echo "- GitHub Pages: HTTP-Erfolg"
+          } > docs/LIVE_RELEASE_STATUS.md
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
