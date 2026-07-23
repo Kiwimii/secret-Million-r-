@@ -7,8 +7,7 @@ export const ROUNDS: readonly RoundDefinition[] = [
   { number: 4, title: "Die Midas-Klammer", timing: "Samstagabend / Finale", points: 4 },
 ] as const;
 
-export const PHASE_ORDER: readonly RoundPhase[] = [
-  "lobby",
+export const ROUND_PHASES: readonly RoundPhase[] = [
   "role_reveal",
   "mission",
   "challenge",
@@ -19,6 +18,35 @@ export const PHASE_ORDER: readonly RoundPhase[] = [
   "voting",
   "evaluation",
   "result",
-  "role_transfer",
-  "finished",
+] as const;
+
+export const PHASE_LABELS: Record<RoundPhase, string> = {
+  lobby: "Lobby",
+  role_reveal: "Rollen freigeben",
+  mission: "Mission ausgeben",
+  challenge: "Challenge",
+  question: "Fragesteller",
+  discussion: "Diskussion",
+  mission_review: "Mission bewerten",
+  advantage: "Vorteil festlegen",
+  voting: "Geheime Abstimmung",
+  evaluation: "Auswertung prüfen",
+  result: "Ergebnis veröffentlichen",
+  role_transfer: "Rollenentscheidung",
+  finished: "Spiel beendet",
+};
+
+export const PLAYER_NAMES = [
+  "Schubi",
+  "Lars",
+  "Danny",
+  "Masl",
+  "Rene",
+  "Gregor",
+  "Felix",
+  "Spieler 8",
+  "Spieler 9",
+  "Spieler 10",
+  "Spieler 11",
+  "Spieler 12",
 ] as const;
