@@ -33,7 +33,7 @@ describe("Textton der Spieloberfläche", () => {
       .map((entry) => `${entry.title} ${entry.body}`)
       .join(" ");
 
-    expect(copy).toContain("Misstrauen");
+    expect(copy).toContain("Verdacht");
     expect(copy).toContain("Zufall");
     expect(copy).toContain("PIN");
     expect(copy).toContain("Vetternwirtschaft");
@@ -44,6 +44,7 @@ describe("Textton der Spieloberfläche", () => {
       const cue = getPhaseTransitionCue(phase, 1);
       expect(cue.body.length).toBeGreaterThan(55);
       expect(cue.signal).toContain("AKTIV");
+      expect(cue.visual.length).toBeGreaterThan(4);
     }
   });
 
@@ -65,6 +66,7 @@ describe("Textton der Spieloberfläche", () => {
       const cue = getActionTransitionCue(action);
       expect(cue.title.length).toBeGreaterThan(10);
       expect(cue.body.length).toBeGreaterThan(55);
+      expect(cue.visual.length).toBeGreaterThan(4);
     }
   });
 });
