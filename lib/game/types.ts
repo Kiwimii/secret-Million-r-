@@ -6,6 +6,10 @@ export type WinnerPoolStatus = "eligible" | "eliminated" | "disqualified";
 
 export type AttendanceStatus = "present" | "temporarily_absent" | "departed";
 
+export type RegistrationStatus = "invited" | "registered";
+
+export type TeamCode = "azur" | "gold";
+
 export type RoundPhase =
   | "lobby"
   | "role_reveal"
@@ -50,12 +54,31 @@ export type AdvantageEffect =
   | "add_one_vote"
   | "ignore_eliminated_vote"
   | "protect_other"
-  | "tie_priority";
+  | "tie_priority"
+  | "remove_vote_against_self"
+  | "redirect_selected_vote"
+  | "bounce_vote_to_voter"
+  | "split_shadow_votes"
+  | "move_vote_between_targets"
+  | "conditional_shadow_vote"
+  | "cap_target_votes"
+  | "self_tie_break";
+
+export type AdvantageSelectionMode =
+  | "none"
+  | "target"
+  | "voter"
+  | "target_and_voter"
+  | "two_targets"
+  | "source_and_target"
+  | "tie_opponent";
 
 export interface PlayerState {
   id: string;
   name: string;
   avatarUrl?: string;
+  registrationStatus?: RegistrationStatus;
+  profilePinHint?: string;
   attendanceStatus: AttendanceStatus;
   winnerPoolStatus: WinnerPoolStatus;
   role: GameRole;
@@ -98,8 +121,31 @@ export interface AdvantageDefinition {
   effect: AdvantageEffect;
   description: string;
   limit: string;
+  playerInstructions: string;
+  hostInstructions: string;
+  selectionMode: AdvantageSelectionMode;
   round?: RoundNumber;
   reserve: boolean;
+  isNew?: boolean;
+}
+
+export interface ChallengeDefinition {
+  id: string;
+  title: string;
+  publicName: string;
+  category: "classic" | "skill" | "teamwork" | "water" | "mind" | "trade";
+  duration: string;
+  material: string[];
+  playerBriefing: string;
+  hostInstructions: string;
+  winCondition: string;
+  safetyNote: string;
+  original: boolean;
+}
+
+export interface TeamAssignment {
+  playerId: string;
+  team: TeamCode;
 }
 
 export interface Vote {
@@ -113,6 +159,8 @@ export interface AdvantageUse {
   effect: AdvantageEffect;
   actorPlayerId: string;
   targetPlayerId?: string;
+  secondaryTargetPlayerId?: string;
+  sourceTargetPlayerId?: string;
   voterPlayerId?: string;
   tieOpponentPlayerId?: string;
 }
