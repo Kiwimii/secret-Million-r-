@@ -91,7 +91,7 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
     questionTextByRound: {},
     questionAnswerByRound: {},
     hostMessage:
-      "Jeder Spieler erstellt jetzt ein neues, PIN-geschütztes Profil. Danach werden Teams und Startmillionär ausgelost.",
+      "Erstellt eure Profile und merkt euch eure PIN. Vier Ziffern schützen hier mehr Geheimnisse als Anstand, Vertrauen und der Gruppenchat zusammen.",
     updatedAt: new Date().toISOString(),
   };
 }
