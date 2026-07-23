@@ -4,7 +4,6 @@ export const ADVANTAGES: readonly AdvantageDefinition[] = [
   {
     id: "r1-double-vote",
     round: 1,
-    reserve: false,
     title: "Echo der Krone",
     effect: "double_vote",
     description: "Der persönliche Abstimmungszettel des Millionärs zählt zweimal.",
@@ -19,7 +18,6 @@ export const ADVANTAGES: readonly AdvantageDefinition[] = [
   {
     id: "r2-block-vote",
     round: 2,
-    reserve: false,
     title: "Siegel des Schweigens",
     effect: "block_vote",
     description: "Die persönliche Stimme eines vorher bestimmten anderen Spielers wird ignoriert.",
@@ -34,7 +32,6 @@ export const ADVANTAGES: readonly AdvantageDefinition[] = [
   {
     id: "r3-two-shadow-votes",
     round: 3,
-    reserve: false,
     title: "Doppelter Schatten",
     effect: "add_two_votes",
     description: "Ein vorher genanntes Ziel erhält zwei zusätzliche Stimmen.",
@@ -49,7 +46,6 @@ export const ADVANTAGES: readonly AdvantageDefinition[] = [
   {
     id: "r4-redirect",
     round: 4,
-    reserve: false,
     title: "Goldene Umleitung",
     effect: "redirect_one_vote",
     description: "Eine Stimme gegen den Millionär wird auf einen anderen Kandidaten umgeleitet.",
@@ -227,6 +223,8 @@ export const ADVANTAGES: readonly AdvantageDefinition[] = [
   },
 ] as const;
 
-export function getAdvantageById(advantageId?: string): AdvantageDefinition | undefined {
+export function getAdvantageById(
+  advantageId?: string,
+): AdvantageDefinition | undefined {
   return ADVANTAGES.find((advantage) => advantage.id === advantageId);
 }
