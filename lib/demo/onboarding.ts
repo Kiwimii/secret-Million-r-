@@ -18,111 +18,124 @@ export interface TransitionCue {
 
 export const INTRO_SLIDES: readonly OnboardingSlide[] = [
   {
-    eyebrow: "Blaue Adria · Geheimprotokoll",
+    eyebrow: "Blaue Adria · Vertrauliche Angelegenheit",
     title: "Einer trägt den Korken.",
     body:
-      "Ein Spieler ist heimlich der Millionär. Niemand kennt seine Identität – nicht einmal sein möglicher Nachfolger.",
-    signal: "IDENTITÄT VERSCHLÜSSELT",
+      "Ein Spieler ist heimlich der Millionär. Die anderen tragen Verdacht, Halbwissen und spätestens nach der ersten Abstimmung kleinere persönliche Kränkungen.",
+    signal: "IDENTITÄT ERFOLGREICH VERHEIMLICHT",
   },
   {
     eyebrow: "Vier Runden · ein Hauptgewinn",
-    title: "Beobachten. Täuschen. Entscheiden.",
+    title: "Freundschaft ist belastbar. Angeblich.",
     body:
-      "Challenges, geheime Missionen, exklusive Hinweise und Abstimmungen verändern in jeder Runde das Kräfteverhältnis.",
-    signal: "SPIELFELD WIRD GELADEN",
+      "Challenges, geheime Missionen und exklusive Hinweise verschieben das Kräfteverhältnis. Aus harmlosen Blicken werden Beweise, aus Beweisen werden Monologe.",
+    signal: "MISSTRAUEN WIRD HOCHGEFAHREN",
   },
   {
     eyebrow: "Persönlicher Zugang",
-    title: "Dein Profil gehört nur dir.",
+    title: "Vier Ziffern gegen kollektiven Verrat.",
     body:
-      "Jeder Spieler erstellt ein neues Profil und schützt es mit einer vierstelligen PIN. Auch die Spielleitung erhält einen eigenen Zugang.",
-    signal: "ZUGRIFFSSCHUTZ AKTIV",
+      "Jeder erstellt sein eigenes Profil und schützt es mit einer PIN. Das ist keine Hochsicherheitsbehörde, aber immerhin mehr Datenschutz als in eurem Gruppenchat.",
+    signal: "NEUGIERIGE FINGER ABGEWIESEN",
   },
   {
-    eyebrow: "Bereit für das Wochenende",
-    title: "Die Adria wartet.",
+    eyebrow: "Bereit für die Blaue Adria",
+    title: "Die Adria hat Schlimmeres gesehen.",
     body:
-      "Wähle jetzt deinen Zugang. Neue Spieler beginnen mit der Profilerstellung, André richtet einmalig die Spielleiter-PIN ein.",
-    signal: "PROTOKOLL BEREIT",
+      "Wähle deinen Zugang. Spieler erschaffen ihre Identität, André übernimmt die Regie – und damit offiziell die Verantwortung für Entscheidungen, die später niemand getroffen haben will.",
+    signal: "PROTOKOLL BEREIT · AUSREDEN NICHT",
   },
 ] as const;
 
 export const PLAYER_TUTORIAL: readonly OnboardingSlide[] = [
   {
     eyebrow: "Spieler-Onboarding · 1/4",
-    title: "Die Lobby ist öffentlich.",
+    title: "Die Lobby kennt Namen, keine Unschuld.",
     body:
-      "Du siehst alle angemeldeten Teilnehmer, ihren Status und dein zufällig ausgelostes Challenge-Team. Geheime Rollen bleiben verborgen.",
-    signal: "LOBBY SYNCHRONISIERT",
+      "Du siehst Teilnehmer, Status und Challenge-Team. Geheime Rollen bleiben verborgen. Also fast wie im echten Leben, nur mit ehrlicher gekennzeichnetem Misstrauen.",
+    signal: "ÖFFENTLICHE FASSADE STABIL",
   },
   {
     eyebrow: "Spieler-Onboarding · 2/4",
-    title: "Deine Rolle ist privat.",
+    title: "Dein Display ist kein Gemeinschaftseigentum.",
     body:
-      "Öffne Rollen-, Missions- und Vorteilskarten nur, wenn niemand auf dein Display sehen kann. Teile niemals deine PIN.",
-    signal: "PRIVATE KARTE VERSIEGELT",
+      "Öffne Rollen-, Missions- und Vorteilskarten nur unbeobachtet. Ein Schulterblick ist kein Ermittlungstalent, sondern lediglich Diebstahl mit schlechter Körperhaltung.",
+    signal: "PRIVATSPHÄRE VORLÄUFIG GERETTET",
   },
   {
     eyebrow: "Spieler-Onboarding · 3/4",
-    title: "Challenges liefern Information.",
+    title: "Sieger bekommen Wissen. Verlierer Charakter.",
     body:
-      "Dein Team erhält ein klares Briefing. Das Gewinnerteam bestimmt einen Fragesteller, der eine exklusive Ja-Nein-Antwort erhält.",
-    signal: "TEAMKANAL AKTIV",
+      "Dein Team erhält ein klares Briefing. Das Gewinnerteam bestimmt den Fragesteller; das andere Team erhält die traditionelle Trostprämie namens persönliche Entwicklung.",
+    signal: "TEAMGEIST UNTER BEOBACHTUNG",
   },
   {
     eyebrow: "Spieler-Onboarding · 4/4",
-    title: "Jede Stimme ist verbindlich.",
+    title: "Deine Stimme überlebt deine Ausrede.",
     body:
-      "Abstimmungen und Rollenentscheidungen werden geheim gespeichert. Nach der Bestätigung kann deine Auswahl nicht offen herumgezeigt werden.",
-    signal: "STIMME BEREIT",
+      "Abstimmungen und Rollenentscheidungen werden geheim gespeichert. Nach der Bestätigung bleibt nur Reue – die älteste Währung strategischer Fehlentscheidungen.",
+    signal: "VERANTWORTUNG ERFOLGREICH ZUGESTELLT",
   },
 ] as const;
 
 export const HOST_TUTORIAL: readonly OnboardingSlide[] = [
   {
     eyebrow: "Spielleiter-Onboarding · 1/4",
-    title: "Du führst – die App sichert ab.",
+    title: "Du führst. Die App begrenzt die Schäden.",
     body:
-      "Die Regieansicht erklärt vor jedem Schritt, was zu prüfen ist und welche Wirkung die nächste Aktion im Spiel auslöst.",
-    signal: "REGIEKANAL AKTIV",
+      "Vor jedem Schritt erklärt die Regieansicht, was zu prüfen ist und was der nächste Klick auslöst. Macht ohne Dokumentation endet sonst bekanntlich in Podcasts.",
+    signal: "REGIEKANAL MIT RESTGEWISSEN AKTIV",
   },
   {
     eyebrow: "Spielleiter-Onboarding · 2/4",
-    title: "Zufall bleibt Zufall.",
+    title: "Zufall ist unbestechlicher als die Gruppe.",
     body:
-      "Millionär und Challenge-Teams werden automatisch gezogen. Bei Korkenabgabe kann der aktuelle Millionär keinen Nachfolger bestimmen.",
-    signal: "ZUFALLSQUELLE GEPRÜFT",
+      "Millionär und Challenge-Teams werden automatisch ausgelost. Auch bei Korkenabgabe bestimmt niemand seinen Lieblingsnachfolger. Vetternwirtschaft hat heute spielfrei.",
+    signal: "NEPOTISMUS TECHNISCH VERHINDERT",
   },
   {
     eyebrow: "Spielleiter-Onboarding · 3/4",
-    title: "Geheime Daten bleiben getrennt.",
+    title: "Geheimnisse bleiben dort, wo sie Schaden anrichten.",
     body:
-      "Missionen, Vorteile, Stimmen und Rollen werden nur dort angezeigt, wo sie benötigt werden. Öffentliche Lobbydaten enthalten keine Geheimnisse.",
-    signal: "GEHEIMBEREICH VERSIEGELT",
+      "Missionen, Vorteile, Stimmen und Rollen erscheinen nur in den nötigen Ansichten. Die öffentliche Lobby zeigt genug für Misstrauen, aber zu wenig für einen Untersuchungsausschuss.",
+    signal: "GEHEIMBEREICH FRAGWÜRDIG SAUBER",
   },
   {
     eyebrow: "Spielleiter-Onboarding · 4/4",
-    title: "Jeder Phasenwechsel wird angekündigt.",
+    title: "Jeder Klick bekommt seinen dramatischen Moment.",
     body:
-      "Beim Auslösen der nächsten Aktion läuft eine kurze Sequenz. Sie schafft einen klaren Übergang und gibt den Spielern Zeit, ihre Displays zu prüfen.",
-    signal: "SPIELLEITUNG BEREIT",
+      "Phasenwechsel starten mit einer kurzen Sequenz. Das schafft Orientierung und gibt allen Zeit, Haltung anzunehmen, obwohl innerlich längst Panik herrscht.",
+    signal: "SPIELLEITUNG BEREIT · MORAL FLEXIBEL",
   },
 ] as const;
 
 const PHASE_COPY: Record<RoundPhase, string> = {
-  lobby: "Profile, Teilnehmerstatus und Teamaufteilung werden für den Start vorbereitet.",
-  role_reveal: "Die privaten Rollenkarten werden freigegeben. Niemand darf auf fremde Displays sehen.",
-  mission: "Die geheime Mission wird ausschließlich dem aktuellen Millionär zugänglich.",
-  challenge: "Die ausgewählte Teamprüfung beginnt. Briefing, Siegbedingung und Sicherheit werden eingeblendet.",
-  question: "Das Gewinnerteam bestimmt einen Fragesteller für eine exklusive Ja-Nein-Information.",
-  discussion: "Die Gruppe diskutiert offen. Wahrheit, Täuschung und Verdacht treffen aufeinander.",
-  mission_review: "Die Spielleitung prüft verdeckt, ob die geheime Mission erfüllt wurde.",
-  advantage: "Ein möglicher Vorteil wird vorbereitet und erst bei der Auswertung wirksam.",
-  voting: "Die geheime Abstimmung wird geöffnet. Jede stimmberechtigte Person wählt genau einmal.",
-  evaluation: "Reguläre Stimmen und mögliche Vorteilskorrekturen werden geprüft.",
-  result: "Das Rundenergebnis wird veröffentlicht und der Gewinnerpool aktualisiert.",
-  role_transfer: "Der Korken wird behalten oder zufällig und geheim neu vergeben.",
-  finished: "Das Finale ist abgeschlossen. Der einzige Hauptgewinner wird aufgelöst.",
+  lobby:
+    "Profile, Status und Teams werden vorbereitet. Noch wirkt alles zivilisiert; genießt diesen statistisch kurzen Zustand.",
+  role_reveal:
+    "Die privaten Rollenkarten werden freigegeben. Fremde Displays bleiben tabu – billige Spionage ist weiterhin nur billige Spionage.",
+  mission:
+    "Der Millionär erhält seine geheime Mission. Alle anderen dürfen aus gewöhnlichem Verhalten eine Verschwörung destillieren.",
+  challenge:
+    "Die Teamprüfung beginnt. Briefing und Siegbedingung sind klar; die späteren Ausreden vermutlich weniger.",
+  question:
+    "Das Gewinnerteam bestimmt einen Fragesteller. Eine exklusive Ja-Nein-Antwort trifft nun auf menschliche Interpretation – bedauerlicherweise.",
+  discussion:
+    "Die Gruppe diskutiert offen. Wahrheit, Bluff und unbegründete Gewissheit kämpfen um denselben knappen Sauerstoff.",
+  mission_review:
+    "Die Spielleitung prüft verdeckt den Missionserfolg. Sympathie ist kein Beweis, auch wenn Gruppen das gern verwechseln.",
+  advantage:
+    "Ein möglicher Vorteil wird vorbereitet. Kleine Regelkorrektur, große Empörung – ein bewährtes gesellschaftliches Prinzip.",
+  voting:
+    "Die geheime Abstimmung ist geöffnet. Jede Person wählt genau einmal und kann sich anschließend hervorragend distanzieren.",
+  evaluation:
+    "Stimmen und Vorteilseffekte werden geprüft. Mathematik übernimmt kurz, weil Emotionen bereits genug Schaden angerichtet haben.",
+  result:
+    "Das Rundenergebnis wird veröffentlicht. Der Gewinnerpool schrumpft, die Zahl der nachträglichen Erklärungen steigt.",
+  role_transfer:
+    "Der Korken bleibt oder wird zufällig neu vergeben. Niemand ernennt seinen Erben; wir sind schließlich kein Familienunternehmen.",
+  finished:
+    "Das Finale ist beendet. Ein Hauptgewinner bleibt übrig – zusammen mit mehreren sehr überzeugenden alternativen Wahrheiten.",
 };
 
 export function getPhaseTransitionCue(
@@ -130,7 +143,7 @@ export function getPhaseTransitionCue(
   round: RoundNumber,
 ): TransitionCue {
   return {
-    eyebrow: `Runde ${round} · Phasenwechsel`,
+    eyebrow: `Runde ${round} · Lageverschärfung`,
     title: PHASE_LABELS[phase],
     body: PHASE_COPY[phase],
     signal: `PHASE ${phase.toUpperCase()} AKTIV`,
@@ -141,70 +154,81 @@ export function getPhaseTransitionCue(
 export function getActionTransitionCue(action: string): TransitionCue {
   const cues: Record<string, TransitionCue> = {
     register: {
-      eyebrow: "Identität wird angelegt",
-      title: "Profil wird versiegelt.",
-      body: "Name, Profilbild und PIN werden verbunden. Anschließend startet dein persönliches Onboarding.",
-      signal: "PROFIL GESICHERT",
+      eyebrow: "Identität wird amtlich verdächtig",
+      title: "Dein Profil wird versiegelt.",
+      body:
+        "Name, Bild und PIN werden verbunden. Danach folgt das Onboarding – eine kurze Schulung darin, anderen Menschen kontrolliert zu misstrauen.",
+      signal: "PROFIL GESICHERT · RUF OFFEN",
     },
     playerUnlock: {
-      eyebrow: "PIN bestätigt",
-      title: "Persönlicher Zugang geöffnet.",
-      body: "Deine private Spieleransicht wird geladen. Andere Profile bleiben gesperrt.",
-      signal: "SPIELERKANAL OFFEN",
+      eyebrow: "PIN überraschend korrekt",
+      title: "Dein persönlicher Zugang öffnet sich.",
+      body:
+        "Die private Spieleransicht wird geladen. Fremde Profile bleiben gesperrt, weil Anstand allein als Sicherheitskonzept mutig wäre.",
+      signal: "SPIELERKANAL OFFEN · NEUGIER DRAUSSEN",
     },
     hostUnlock: {
-      eyebrow: "Spielleiter-PIN bestätigt",
-      title: "Regiezentrale wird geöffnet.",
-      body: "Die nächste Spielaktion, alle Prüfhinweise und die geheime Steuerung werden geladen.",
-      signal: "REGIEKANAL OFFEN",
+      eyebrow: "Spielleiter-PIN akzeptiert",
+      title: "Die Regiezentrale erwacht.",
+      body:
+        "Prüfhinweise, Geheimsteuerung und die nächste verantwortungsvolle Fehlentscheidung werden vorbereitet.",
+      signal: "REGIEKANAL OFFEN · HAFTUNG UNGEKLÄRT",
     },
     revealRole: {
       eyebrow: "Private Karte",
-      title: "Rolle wird entschlüsselt.",
-      body: "Halte dein Display verdeckt. Diese Information ist ausschließlich für dich bestimmt.",
-      signal: "ROLLE ENTSCHLÜSSELT",
+      title: "Deine Rolle wird entschlüsselt.",
+      body:
+        "Halte das Display verdeckt. Diese Information gehört ausschließlich dir – bis dein Gesicht sie freiwillig veröffentlicht.",
+      signal: "ROLLE ENTSCHLÜSSELT · MIMIK VERDÄCHTIG",
     },
     vote: {
       eyebrow: "Geheime Abstimmung",
       title: "Deine Stimme wird versiegelt.",
-      body: "Die Auswahl wird gespeichert und erst durch die Spielleitung ausgewertet.",
-      signal: "STIMME GESPEICHERT",
+      body:
+        "Die Auswahl wird gespeichert und später ausgewertet. Ab jetzt heißt impulsiv offiziell strategisch.",
+      signal: "STIMME GESPEICHERT · REUE OPTIONAL",
     },
     roleDecision: {
       eyebrow: "Geheime Rollenentscheidung",
-      title: "Entscheidung wird verschlossen.",
-      body: "Die Auflösung erfolgt erst, wenn alle erforderlichen Entscheidungen vorliegen.",
-      signal: "ENTSCHEIDUNG GESPEICHERT",
+      title: "Die Entscheidung verschwindet im Tresor.",
+      body:
+        "Aufgelöst wird erst, wenn alle Berechtigten entschieden haben. Demokratie braucht Zeit, besonders bei vierstelliger PIN und Getränk in der Hand.",
+      signal: "ENTSCHEIDUNG GESPEICHERT · AUSREDE ARCHIVIERT",
     },
     draw: {
       eyebrow: "Gesicherte Zufallsauslosung",
-      title: "Der Korken findet seinen Träger.",
-      body: "Die Auswahl erfolgt zufällig und geheim aus allen aktuell berechtigten Spielern.",
-      signal: "AUSLOSUNG ABGESCHLOSSEN",
+      title: "Der Korken sucht sein nächstes Opfer.",
+      body:
+        "Die Auswahl erfolgt zufällig und geheim aus allen Berechtigten. Beziehungen, Charme und laut vorgetragene Wünsche bleiben wertlos.",
+      signal: "AUSLOSUNG ABGESCHLOSSEN · SCHICKSAL SCHULDIG",
     },
     teams: {
       eyebrow: "Challenge-Vorbereitung",
-      title: "Teams werden neu gemischt.",
-      body: "Alle anwesenden Teilnehmer werden zufällig und möglichst gleichmäßig auf Azur und Gold verteilt.",
-      signal: "TEAMS AUSGELOST",
+      title: "Die Zweckgemeinschaften werden gebildet.",
+      body:
+        "Alle Anwesenden werden zufällig auf Azur und Gold verteilt. Freundschaften können später unter kontrollierten Bedingungen beschädigt werden.",
+      signal: "TEAMS AUSGELOST · LOYALITÄT BEFRISTET",
     },
     evaluation: {
       eyebrow: "Auswertung läuft",
-      title: "Stimmen werden geprüft.",
-      body: "Reguläre Stimmen, Vorteilseffekte und mögliche Gleichstände werden getrennt berechnet.",
-      signal: "ERGEBNIS BEREIT",
+      title: "Die Mathematik betritt den Tatort.",
+      body:
+        "Reguläre Stimmen, Vorteile und Gleichstände werden getrennt berechnet. Zahlen lügen seltener, wirken dafür persönlich beleidigender.",
+      signal: "ERGEBNIS BEREIT · GEFÜHLE UNBERÜCKSICHTIGT",
     },
     result: {
       eyebrow: "Rundenabschluss",
-      title: "Das Urteil wird veröffentlicht.",
-      body: "Ausscheiden, Punkte und die nächste Rollenentscheidung werden verbindlich vorbereitet.",
-      signal: "RUNDE ABGESCHLOSSEN",
+      title: "Das Urteil verlässt den sicheren Raum.",
+      body:
+        "Ausscheiden, Punkte und Rollenwechsel werden verbindlich. Für nachträgliche Diplomatie ist jetzt ein guter, aber nutzloser Moment.",
+      signal: "RUNDE ABGESCHLOSSEN · BEZIEHUNGEN IN PRÜFUNG",
     },
     next: {
       eyebrow: "Nächste Aktion",
-      title: "Das Protokoll wird fortgesetzt.",
-      body: "Die aktuelle Phase wird geschlossen und der nächste Abschnitt wird vorbereitet.",
-      signal: "NÄCHSTER ABSCHNITT BEREIT",
+      title: "Das Protokoll marschiert weiter.",
+      body:
+        "Die aktuelle Phase wird geschlossen. Der nächste Abschnitt beginnt, obwohl vermutlich noch jemand seine Verteidigungsrede sortiert.",
+      signal: "NÄCHSTER ABSCHNITT AKTIV",
     },
   };
   return cues[action] ?? cues.next;
