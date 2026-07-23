@@ -46,6 +46,24 @@ jobs:
       - name: Initialize CLI configuration
         run: supabase init --force
 
+      - name: Normalize live migration source
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration="supabase/migrations/20260724000000_live_game_instances.sql"
+          python <<'PY'
+          from pathlib import Path
+          path = Path("supabase/migrations/20260724000000_live_game_instances.sql")
+          text = path.read_text()
+          old = "  current_role public.game_role\n"
+          new = '  "current_role" public.game_role\n'
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit("Die erwartete current_role-Deklaration wurde nicht gefunden.")
+          PY
+          grep -n '"current_role" public.game_role' "$migration"
+
       - name: Link remote project
         id: link
         continue-on-error: true
@@ -112,8 +130,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
-          git add docs/SUPABASE_DEPLOY_STATUS.md
-          git commit -m "[skip ci] Record Supabase deployment status"
+          git add docs/SUPABASE_DEPLOY_STATUS.md supabase/migrations/20260724000000_live_game_instances.sql
+          git commit -m "[skip ci] Record Supabase deployment status and SQL normalization"
           git push origin main
 
       - name: Fail unsuccessful deployment
