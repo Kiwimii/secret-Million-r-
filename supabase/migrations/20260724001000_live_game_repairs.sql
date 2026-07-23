@@ -1,4 +1,5 @@
 -- Reparaturen für die Live-Mehrgeräte-Migration.
+-- Dieser Stand wird nach der Korrektur der reservierten Fortschrittsspalte erneut ausgerollt.
 
 create or replace function public.emit_live_game_refresh()
 returns trigger
