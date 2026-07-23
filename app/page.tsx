@@ -13,7 +13,7 @@ export default function HomePage() {
         <nav className="topbar">
           <span className="brand-mark">SM</span>
           <span className="eyebrow">Blaue Adria · Geheimakte 2026</span>
-          <span className="status-dot">System bereit</span>
+          <span className="status-dot">Testversion bereit</span>
         </nav>
 
         <div className="hero-content">
@@ -27,7 +27,8 @@ export default function HomePage() {
           </p>
 
           <div className="actions">
-            <a className="button button-primary" href="/join">Spiel beitreten</a>
+            <a className="button button-primary" href="/demo">Browser-Test starten</a>
+            <a className="button button-secondary" href="/join">Spiel beitreten</a>
             <a className="button button-secondary" href="/admin">Spielleitung öffnen</a>
           </div>
         </div>
