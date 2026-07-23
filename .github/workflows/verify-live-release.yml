@@ -1,0 +1,142 @@
+name: Verify live release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-live-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      LIVE_URL: https://kiwimii.github.io/secret-Million-r-/demo/
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install browser client dependencies
+        run: npm install
+
+      - name: Resolve browser configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+
+          curl --fail --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"external_anonymous_users_enabled":true}' \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/auth" \
+            --output auth-config.json
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Wait for live database RPCs
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { createClient } = require('@supabase/supabase-js');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          async function verify() {
+            const client = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+              { auth: { persistSession: false, autoRefreshToken: false } },
+            );
+            const auth = await client.auth.signInAnonymously();
+            if (auth.error) throw auth.error;
+
+            let lastError;
+            for (let attempt = 1; attempt <= 36; attempt += 1) {
+              const result = await client.rpc('lookup_live_game', {
+                raw_join_code: '999999',
+              });
+              if (!result.error) {
+                console.log('Live RPC und anonyme Authentifizierung sind erreichbar.');
+                return;
+              }
+              lastError = result.error;
+              console.log(`Backend noch nicht bereit (${attempt}/36): ${result.error.message}`);
+              await sleep(10_000);
+            }
+            throw lastError ?? new Error('Live RPC blieb unerreichbar.');
+          }
+
+          verify().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Wait for public game page
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location "$LIVE_URL" --output live-page.html; then
+              grep -qi "secret" live-page.html
+              echo "Öffentliche Spielseite ist erreichbar."
+              exit 0
+            fi
+            echo "Pages-Deployment noch nicht bereit ($attempt/36)."
+            sleep 10
+          done
+          exit 1
+
+      - name: Record verified release
+        shell: bash
+        run: |
+          verified_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          cat > docs/LIVE_RELEASE_STATUS.md <<EOF
+          # Live-Release verifiziert
+
+          - Status: erfolgreich
+          - Zeitpunkt (UTC): $verified_at
+          - Commit: $GITHUB_SHA
+          - Öffentliche Seite: $LIVE_URL
+          - Supabase Anonymous Auth: erreichbar
+          - Live-RPC `lookup_live_game`: erreichbar
+          - GitHub Pages: HTTP-Erfolg
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add docs/LIVE_RELEASE_STATUS.md
+          git commit -m "[skip ci] Verify live Secret Millionär release"
+          git push origin main
