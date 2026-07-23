@@ -9,7 +9,7 @@ on:
       - ".github/workflows/deploy-supabase.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: supabase-production-database
@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Validate required secrets
         shell: bash
@@ -45,10 +47,75 @@ jobs:
         run: supabase init --force
 
       - name: Link remote project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        id: link
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_ID" 2>&1 | tee supabase-link.log
 
       - name: Preview migrations
-        run: supabase db push --dry-run
+        id: preview
+        continue-on-error: true
+        if: steps.link.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          supabase db push --dry-run --debug 2>&1 | tee supabase-preview.log
 
       - name: Apply migrations
-        run: supabase db push
+        id: apply
+        continue-on-error: true
+        if: steps.link.outcome == 'success' && steps.preview.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          supabase db push --debug 2>&1 | tee supabase-apply.log
+
+      - name: Record database deployment status
+        if: always()
+        env:
+          LINK_OUTCOME: ${{ steps.link.outcome }}
+          PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="erfolgreich"
+          if [[ "$LINK_OUTCOME" != "success" || "$PREVIEW_OUTCOME" != "success" || "$APPLY_OUTCOME" != "success" ]]; then
+            status="fehlgeschlagen"
+          fi
+
+          {
+            echo "# Supabase-Datenbank-Deployment"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Projektverknüpfung: $LINK_OUTCOME"
+            echo "- Migrationsvorschau: $PREVIEW_OUTCOME"
+            echo "- Migration angewendet: $APPLY_OUTCOME"
+            echo
+            echo "## Letzte Diagnosezeilen"
+            echo '```text'
+            for file in supabase-link.log supabase-preview.log supabase-apply.log; do
+              if [[ -f "$file" ]]; then
+                echo "--- $file ---"
+                tail -n 120 "$file" \
+                  | sed -E 's/(postgresql:\/\/[^:]+:)[^@]+@/\1***@/g' \
+                  | sed -E 's/(password[=: ]+)[^ ]+/\1***/Ig'
+              fi
+            done
+            echo '```'
+          } > docs/SUPABASE_DEPLOY_STATUS.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add docs/SUPABASE_DEPLOY_STATUS.md
+          git commit -m "[skip ci] Record Supabase deployment status"
+          git push origin main
+
+      - name: Fail unsuccessful deployment
+        if: always() && (steps.link.outcome != 'success' || steps.preview.outcome != 'success' || steps.apply.outcome != 'success')
+        run: exit 1
