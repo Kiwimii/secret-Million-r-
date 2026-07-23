@@ -11,7 +11,7 @@ import {
 function teamLabel(team?: "azur" | "gold") {
   if (team === "azur") return "Team Azur";
   if (team === "gold") return "Team Gold";
-  return "Noch nicht ausgelost";
+  return "Noch keiner Zweckgemeinschaft zugeteilt";
 }
 
 export default function LobbyOverview({
@@ -32,8 +32,8 @@ export default function LobbyOverview({
     <section className={`demo-panel lobby-overview ${compact ? "compact" : ""}`}>
       <div className="demo-panel-heading lobby-heading">
         <div>
-          <p className="section-label">Gemeinsame Lobby</p>
-          <h2>Teilnehmer und Challenge-Teams</h2>
+          <p className="section-label">Gemeinsame Lobby · öffentlicher Tatort</p>
+          <h2>Teilnehmer, Teams und auffällig harmlose Gesichter</h2>
         </div>
         <div className="lobby-challenge-summary">
           <small>Aktuelle Challenge</small>
@@ -45,8 +45,8 @@ export default function LobbyOverview({
       <div className="lobby-player-grid">
         {snapshot.game.players.length === 0 && (
           <div className="lobby-empty-state">
-            Noch niemand ist registriert. Das erste persönliche Profil erscheint
-            hier unmittelbar nach der PIN-geschützten Anmeldung.
+            Noch niemand ist registriert. Der Tatort ist sauber, die Verdächtigen
+            verspäten sich offenbar professionell.
           </div>
         )}
         {snapshot.game.players.map((player) => {
@@ -73,7 +73,9 @@ export default function LobbyOverview({
               </div>
               <div className={`lobby-team team-${team ?? "none"}`}>
                 <span>{teamLabel(team)}</span>
-                {winner && team === winner && <strong>Challenge-Sieger</strong>}
+                {winner && team === winner && (
+                  <strong>Challenge-Sieger · vorläufig unerträglich</strong>
+                )}
               </div>
             </article>
           );
@@ -83,7 +85,7 @@ export default function LobbyOverview({
       <div className="lobby-legend">
         <span><i className="team-dot azur" /> Team Azur</span>
         <span><i className="team-dot gold" /> Team Gold</span>
-        <span>Teams werden für jede Runde neu und zufällig ausgelost.</span>
+        <span>Teams werden jede Runde neu ausgelost. Vetternwirtschaft wurde technisch erschwert.</span>
       </div>
     </section>
   );
