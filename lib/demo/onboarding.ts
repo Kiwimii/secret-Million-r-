@@ -1,5 +1,5 @@
-import { PHASE_LABELS } from "@/lib/game/constants";
-import type { RoundPhase, RoundNumber } from "@/lib/game/types";
+import { PHASE_LABELS } from "../game/constants";
+import type { RoundPhase, RoundNumber } from "../game/types";
 
 export interface OnboardingSlide {
   eyebrow: string;
