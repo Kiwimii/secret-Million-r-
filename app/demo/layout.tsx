@@ -4,6 +4,7 @@ import "./expansion.css";
 import "./onboarding.css";
 import "./onboarding-fixes.css";
 import "./onboarding-scenes.css";
+import "./live-game.css";
 
 export default function DemoLayout({
   children,
