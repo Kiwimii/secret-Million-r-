@@ -1,40 +1,50 @@
 # Secret Millionär – Blaue Adria
 
-Mobile, moderierte Echtzeit-Web-App für das Secret-Millionär-Wochenende.
+Mobile, moderierte Web-App für das Secret-Millionär-Wochenende.
 
-## Browser-Testversion
+## Einsatztest im Browser
 
-Die Route `/demo` enthält eine mobile-first Testumgebung für Smartphone und Desktop:
+Die Route `/demo` enthält die vollständige mobile Spielsimulation für Smartphone und Desktop:
 
-- Spielleiter- und Spieleransicht
-- Rollenkarte mit diskreter Aufdeckung
-- Mission und Vorteil für den Millionär
-- geheime Abstimmung
-- Spielerstatus für Ausscheiden, Abreise, Pause und Disqualifikation
-- Runden- und Phasensteuerung
-- simulierte Auswertung und Punktevergabe
-- Speicherung im Browser
+- geführte Spielleiteransicht mit Ziel, Prüfliste, Klickwirkung, Warnungen und Sperrgründen
+- private Spieleransichten mit versiegelter Rollenkarte
+- zufällige und geheime Auslosung des Startmillionärs
+- Korken behalten oder abgeben, ohne eine Zielperson bestimmen zu können
+- zufällige Nachfolge bei Abgabe, Enttarnung oder Ausfall
+- rundenabhängige Missionsfristen
+- Fragesteller, geheime Ja-Nein-Frage und private Antwort
+- Hauptabstimmung, echte Stichwahl und Zufallslos bei erneutem Gleichstand
+- tatsächliche Anwendung der Missionsvorteile
+- Punktevergabe, Finalregel und Tiebreaker
+- Ausscheiden, Abreise, Pause und Disqualifikation
+- automatische Bereinigung ungültiger offener Stimmen
 - Synchronisierung zwischen mehreren Tabs desselben Browsers
+- Speicherung des Teststands im Browser
 - installierbares Web-App-Manifest
 
-Die Testversion benötigt keine Supabase-Schlüssel und kann sofort bereitgestellt werden. Getrennte Smartphones werden in diesem Zwischenstand noch nicht miteinander synchronisiert. Das folgt mit der produktiven Supabase-Anbindung.
+Die Browser-Simulation benötigt keine Supabase-Schlüssel. Getrennte Smartphones werden erst durch die produktive Supabase-Anbindung miteinander synchronisiert.
 
-## Aktueller Stand
+## Verbindliche Millionärsregel
 
-Der aktuelle Entwicklungsstand enthält:
+Der Millionär wird niemals manuell ausgewählt.
 
-- atmosphärische, responsive Intro-Seite
-- Spieler-Beitrittsmaske mit vorbereitetem Profilfoto-Ablauf
-- interaktives Spielleiter-Dashboard im lokalen Entwicklungsmodus
-- getrennte Verwaltung von Gewinnerpool und Anwesenheit
-- jederzeitiges Ausscheiden, Abreisen, Pausieren, Disqualifizieren und administratives Wiederherstellen
-- automatische Ablaufblockade, wenn der aktuelle Millionär nicht mehr verfügbar ist
-- korrekte Phasenwechsel über vier Runden einschließlich Rollenentscheidung und Finale
-- vollständiger Missions- und Vorteilskatalog aus den Spielunterlagen
-- serverunabhängige Abstimmungsauswertung für Hauptwahl und Stichwahl
-- Logik für alle acht Vorteile, Punktevergabe und Final-Tiebreaker
-- gehärtetes Supabase-Datenmodell für Rollen, Missionen, Stimmen, Punkte und Ereignisprotokoll
-- Unit-Tests und GitHub-Actions-CI
+1. Vor Runde 1 lost die App zufällig aus allen anwesenden und gewinnberechtigten Spielern aus.
+2. Behält der aktuelle Millionär den Korken, bleibt seine Rolle bestehen.
+3. Gibt er den Korken ab, bestimmt er keine Zielperson. Die App lost zufällig aus allen anderen anwesenden und gewinnberechtigten Spielern aus.
+4. Wird der Millionär enttarnt oder fällt aus, lost die App zufällig aus allen verbliebenen Berechtigten aus.
+5. Die neue Rolle bleibt bis zur Rollenfreigabe der nächsten Runde versiegelt.
+
+Die Browser-Version nutzt Web Crypto. Die Supabase-Datenbank enthält zusätzlich eine hostgeschützte serverseitige Zufallsfunktion und verhindert direkte Client-Updates der geheimen Millionärs-ID.
+
+## Sicherheitsmodell
+
+- Gewinnerpoolstatus und Anwesenheit sind getrennte Zustände.
+- Spieler können den öffentlichen Spielzustand lesen, aber niemals die Millionärs-ID.
+- Spieler lesen ausschließlich ihre eigene Rolle der aktuell freigegebenen Runde.
+- Bereits ausgeloste Rollen einer Folgerunde bleiben während der Korkenauflösung verborgen.
+- Missionen, Vorteile und exklusive Antworten werden erst in der jeweils zulässigen Phase sichtbar.
+- Rohstimmen, Punkte und vollständige Auswertungen bleiben bei der Spielleitung.
+- Kritische Auslosungen und Rollenentscheidungen werden protokolliert.
 
 ## Lokaler Start
 
@@ -44,7 +54,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Danach läuft die Anwendung unter `http://localhost:3000`. Die mobile Testversion liegt unter `http://localhost:3000/demo`.
+Danach läuft die Anwendung unter `http://localhost:3000`. Der Einsatztest liegt unter `http://localhost:3000/demo`.
 
 ## Qualitätsprüfung
 
@@ -57,13 +67,17 @@ npm run build
 
 ## Projektstruktur
 
-- `app/` – Next.js-Oberflächen
-- `app/demo/` – mobile Browser-Testversion
-- `lib/demo/` – lokaler Testspielstand und Browser-Synchronisierung
-- `lib/game/` – deterministische Spielregeln und Kataloge
-- `supabase/migrations/` – Datenbankschema und Zugriffsschutz
+- `app/demo/` – geführte Browser-Simulation
+- `lib/demo/` – lokaler Testspielstand und Tab-Synchronisierung
+- `lib/game/` – deterministische Regeln, Zufallsauslosung und Spielleiteranweisungen
+- `supabase/migrations/` – Datenbankschema, Geheimnisschutz und serverseitige Rollenwahl
 - `docs/ARCHITECTURE.md` – Architektur- und Sicherheitsentscheidungen
 
-## Nächster Meilenstein
+## Noch offen für echten Mehrgerätebetrieb
 
-Vercel-Bereitstellung der Browser-Testversion. Danach werden anonyme Spieleridentitäten, Spielleiter-Login, dauerhafte Speicherung und Live-Synchronisierung über das bereits angelegte Supabase-Projekt verbunden.
+- öffentliche Vercel-Adresse
+- Supabase-Umgebungsvariablen im Hosting
+- Spielerbeitritt mit anonymer Geräteidentität
+- serverseitige Aktionen für Stimmen, Rollenentscheidungen und Phasenwechsel
+- Realtime-Synchronisierung zwischen getrennten Smartphones
+- abschließender Probelauf mit allen vorgesehenen Geräten
