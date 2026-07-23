@@ -67,19 +67,39 @@ function validateVotes(
   }
 
   if (requireAllVotes && seenVoters.size !== voters.length) {
-    const missing = voters.filter((player) => !seenVoters.has(player.id)).map((player) => player.name);
+    const missing = voters
+      .filter((player) => !seenVoters.has(player.id))
+      .map((player) => player.name);
     throw new Error(`Es fehlen Stimmen von: ${missing.join(", ")}.`);
   }
 
   return relevantVotes;
 }
 
-function updateAdjustment(entries: Map<string, VoteTallyEntry>, playerId: string, delta: number) {
+function updateAdjustment(
+  entries: Map<string, VoteTallyEntry>,
+  playerId: string,
+  delta: number,
+) {
   const entry = entries.get(playerId);
   if (!entry) {
     throw new Error("Der Vorteil verweist auf kein zulässiges Abstimmungsziel.");
   }
   entry.adjustment += delta;
+}
+
+function buildTally(entries: Map<string, VoteTallyEntry>): VoteTallyEntry[] {
+  return [...entries.values()].map((entry) => ({
+    ...entry,
+    effectiveVotes: Math.max(0, entry.regularVotes + entry.adjustment),
+  }));
+}
+
+function getTopPlayerIds(tally: VoteTallyEntry[]): string[] {
+  const maximum = Math.max(...tally.map((entry) => entry.effectiveVotes));
+  return tally
+    .filter((entry) => entry.effectiveVotes === maximum)
+    .map((entry) => entry.playerId);
 }
 
 export function evaluateVotes(
@@ -88,7 +108,9 @@ export function evaluateVotes(
   options: VoteEvaluationOptions = {},
 ): VoteEvaluation {
   const stage = options.stage ?? "main";
-  const candidateIds = options.accusedPlayerIds ?? getAccusablePlayers(state).map((player) => player.id);
+  const candidateIds =
+    options.accusedPlayerIds ??
+    getAccusablePlayers(state).map((player) => player.id);
   const relevantVotes = validateVotes(
     state,
     votes,
@@ -126,27 +148,42 @@ export function evaluateVotes(
 
     switch (advantage.effect) {
       case "double_vote":
-        if (!actorVote) throw new Error("Die doppelte Stimme benötigt eine abgegebene Stimme des Millionärs.");
+        if (!actorVote) {
+          throw new Error("Die doppelte Stimme benötigt eine abgegebene Stimme des Millionärs.");
+        }
         updateAdjustment(entries, actorVote.accusedPlayerId, 1);
         break;
+
       case "block_vote": {
-        if (!advantage.voterPlayerId || advantage.voterPlayerId === advantage.actorPlayerId) {
+        if (
+          !advantage.voterPlayerId ||
+          advantage.voterPlayerId === advantage.actorPlayerId
+        ) {
           throw new Error("Für die Stimmensperre muss ein anderer Wähler bestimmt werden.");
         }
         const blockedVote = relevantVotes.find(
           (vote) => vote.voterPlayerId === advantage.voterPlayerId,
         );
-        if (!blockedVote) throw new Error("Der gesperrte Spieler hat keine Stimme abgegeben.");
+        if (!blockedVote) {
+          throw new Error("Der gesperrte Spieler hat keine Stimme abgegeben.");
+        }
         updateAdjustment(entries, blockedVote.accusedPlayerId, -1);
         ignoredVoterPlayerIds.push(blockedVote.voterPlayerId);
         break;
       }
+
       case "add_two_votes":
-        if (!advantage.targetPlayerId) throw new Error("Für die Schattenstimmen fehlt das Ziel.");
+        if (!advantage.targetPlayerId) {
+          throw new Error("Für die Schattenstimmen fehlt das Ziel.");
+        }
         updateAdjustment(entries, advantage.targetPlayerId, 2);
         break;
+
       case "redirect_one_vote":
-        if (!advantage.targetPlayerId || advantage.targetPlayerId === advantage.actorPlayerId) {
+        if (
+          !advantage.targetPlayerId ||
+          advantage.targetPlayerId === advantage.actorPlayerId
+        ) {
           throw new Error("Für die Umleitung muss ein anderer gewinnberechtigter Spieler gewählt werden.");
         }
         if ((entries.get(advantage.actorPlayerId)?.regularVotes ?? 0) > 0) {
@@ -154,12 +191,18 @@ export function evaluateVotes(
           updateAdjustment(entries, advantage.targetPlayerId, 1);
         }
         break;
+
       case "add_one_vote":
-        if (!advantage.targetPlayerId) throw new Error("Für die Schattenstimme fehlt das Ziel.");
+        if (!advantage.targetPlayerId) {
+          throw new Error("Für die Schattenstimme fehlt das Ziel.");
+        }
         updateAdjustment(entries, advantage.targetPlayerId, 1);
         break;
+
       case "ignore_eliminated_vote": {
-        if (!advantage.voterPlayerId) throw new Error("Für die blinde Stimme fehlt der Wähler.");
+        if (!advantage.voterPlayerId) {
+          throw new Error("Für die blinde Stimme fehlt der Wähler.");
+        }
         const selectedVoter = getPlayer(state, advantage.voterPlayerId);
         if (selectedVoter.winnerPoolStatus !== "eliminated") {
           throw new Error("Die blinde Stimme darf nur einen bereits ausgeschiedenen Spieler betreffen.");
@@ -167,32 +210,134 @@ export function evaluateVotes(
         const ignoredVote = relevantVotes.find(
           (vote) => vote.voterPlayerId === advantage.voterPlayerId,
         );
-        if (!ignoredVote) throw new Error("Der ausgewählte ausgeschiedene Spieler hat nicht abgestimmt.");
+        if (!ignoredVote) {
+          throw new Error("Der ausgewählte ausgeschiedene Spieler hat nicht abgestimmt.");
+        }
         updateAdjustment(entries, ignoredVote.accusedPlayerId, -1);
         ignoredVoterPlayerIds.push(ignoredVote.voterPlayerId);
         break;
       }
+
       case "protect_other":
-        if (!advantage.targetPlayerId || advantage.targetPlayerId === advantage.actorPlayerId) {
+        if (
+          !advantage.targetPlayerId ||
+          advantage.targetPlayerId === advantage.actorPlayerId
+        ) {
           throw new Error("Das Schutzschild muss einen anderen Spieler schützen.");
         }
         if ((entries.get(advantage.targetPlayerId)?.regularVotes ?? 0) > 0) {
           updateAdjustment(entries, advantage.targetPlayerId, -1);
         }
         break;
+
       case "tie_priority":
+        break;
+
+      case "remove_vote_against_self":
+        if ((entries.get(advantage.actorPlayerId)?.regularVotes ?? 0) > 0) {
+          updateAdjustment(entries, advantage.actorPlayerId, -1);
+        }
+        break;
+
+      case "redirect_selected_vote": {
+        if (!advantage.voterPlayerId || !advantage.targetPlayerId) {
+          throw new Error("Für den Doppelagenten werden Wähler und neues Ziel benötigt.");
+        }
+        if (advantage.voterPlayerId === advantage.actorPlayerId) {
+          throw new Error("Der Doppelagent muss einen anderen Wähler betreffen.");
+        }
+        const redirectedVote = relevantVotes.find(
+          (vote) => vote.voterPlayerId === advantage.voterPlayerId,
+        );
+        if (!redirectedVote) {
+          throw new Error("Der ausgewählte Doppelagent hat keine Stimme abgegeben.");
+        }
+        updateAdjustment(entries, redirectedVote.accusedPlayerId, -1);
+        updateAdjustment(entries, advantage.targetPlayerId, 1);
+        break;
+      }
+
+      case "bounce_vote_to_voter": {
+        if (!advantage.voterPlayerId) {
+          throw new Error("Für das Bumerang-Protokoll fehlt der betroffene Wähler.");
+        }
+        if (!entries.has(advantage.voterPlayerId)) {
+          throw new Error("Der betroffene Wähler ist kein zulässiges Abstimmungsziel.");
+        }
+        const bouncedVote = relevantVotes.find(
+          (vote) => vote.voterPlayerId === advantage.voterPlayerId,
+        );
+        if (!bouncedVote) {
+          throw new Error("Der betroffene Wähler hat keine Stimme abgegeben.");
+        }
+        updateAdjustment(entries, bouncedVote.accusedPlayerId, -1);
+        updateAdjustment(entries, advantage.voterPlayerId, 1);
+        break;
+      }
+
+      case "split_shadow_votes":
+        if (
+          !advantage.targetPlayerId ||
+          !advantage.secondaryTargetPlayerId ||
+          advantage.targetPlayerId === advantage.secondaryTargetPlayerId
+        ) {
+          throw new Error("Zwillingsschatten benötigt zwei unterschiedliche Ziele.");
+        }
+        updateAdjustment(entries, advantage.targetPlayerId, 1);
+        updateAdjustment(entries, advantage.secondaryTargetPlayerId, 1);
+        break;
+
+      case "move_vote_between_targets":
+        if (
+          !advantage.sourceTargetPlayerId ||
+          !advantage.targetPlayerId ||
+          advantage.sourceTargetPlayerId === advantage.targetPlayerId
+        ) {
+          throw new Error("Die falsche Fährte benötigt zwei unterschiedliche Ziele.");
+        }
+        if ((entries.get(advantage.sourceTargetPlayerId)?.regularVotes ?? 0) > 0) {
+          updateAdjustment(entries, advantage.sourceTargetPlayerId, -1);
+          updateAdjustment(entries, advantage.targetPlayerId, 1);
+        }
+        break;
+
+      case "conditional_shadow_vote":
+        if (!advantage.targetPlayerId) {
+          throw new Error("Für das Midas-Echo fehlt das Ziel.");
+        }
+        if ((entries.get(advantage.targetPlayerId)?.regularVotes ?? 0) > 0) {
+          updateAdjustment(entries, advantage.targetPlayerId, 1);
+        }
+        break;
+
+      case "cap_target_votes": {
+        if (!advantage.targetPlayerId) {
+          throw new Error("Für die Nebelwand fehlt das Ziel.");
+        }
+        const regularVotes = entries.get(advantage.targetPlayerId)?.regularVotes ?? 0;
+        if (regularVotes > 2) {
+          updateAdjustment(entries, advantage.targetPlayerId, 2 - regularVotes);
+        }
+        break;
+      }
+
+      case "self_tie_break":
         break;
     }
   }
 
-  const tally = [...entries.values()].map((entry) => ({
-    ...entry,
-    effectiveVotes: Math.max(0, entry.regularVotes + entry.adjustment),
-  }));
-  const maximum = Math.max(...tally.map((entry) => entry.effectiveVotes));
-  const topPlayerIds = tally
-    .filter((entry) => entry.effectiveVotes === maximum)
-    .map((entry) => entry.playerId);
+  let tally = buildTally(entries);
+  let topPlayerIds = getTopPlayerIds(tally);
+
+  if (
+    advantage?.effect === "self_tie_break" &&
+    topPlayerIds.length > 1 &&
+    topPlayerIds.includes(advantage.actorPlayerId)
+  ) {
+    updateAdjustment(entries, advantage.actorPlayerId, -1);
+    tally = buildTally(entries);
+    topPlayerIds = getTopPlayerIds(tally);
+  }
 
   if (
     advantage?.effect === "tie_priority" &&
@@ -215,7 +360,8 @@ export function evaluateVotes(
     tally,
     topPlayerIds,
     requiresRunoff: topPlayerIds.length > 1,
-    eliminatedPlayerId: topPlayerIds.length === 1 ? topPlayerIds[0] : undefined,
+    eliminatedPlayerId:
+      topPlayerIds.length === 1 ? topPlayerIds[0] : undefined,
     ignoredVoterPlayerIds,
   };
 }
@@ -257,7 +403,9 @@ export function finalizeRound(
   const millionairePlayerId = state.millionairePlayerId;
   const eliminatedPlayerId = evaluation.eliminatedPlayerId;
   const millionaireSurvived = millionairePlayerId !== eliminatedPlayerId;
-  const roundDefinition = ROUNDS.find((round) => round.number === state.currentRound);
+  const roundDefinition = ROUNDS.find(
+    (round) => round.number === state.currentRound,
+  );
   if (!roundDefinition) throw new Error("Ungültige Runde.");
 
   const elimination = applyPlayerLifecycleChange(state, {
@@ -280,7 +428,10 @@ export function finalizeRound(
 
     if (player.id === millionairePlayerId && millionaireSurvived) {
       pointRecipientPlayerIds.push(player.id);
-      return { ...player, points: player.points + roundDefinition.points };
+      return {
+        ...player,
+        points: player.points + roundDefinition.points,
+      };
     }
 
     if (
@@ -350,11 +501,20 @@ export function resolveFinalWinner(
   const bestPoints = Math.max(...candidates.map((player) => player.points));
   candidates = candidates.filter((player) => player.points === bestPoints);
   if (candidates.length === 1) {
-    return { winnerPlayerId: candidates[0].id, requiresLot: false, tiedPlayerIds: [], reason: "points" };
+    return {
+      winnerPlayerId: candidates[0].id,
+      requiresLot: false,
+      tiedPlayerIds: [],
+      reason: "points",
+    };
   }
 
-  const bestCorrectGuesses = Math.max(...candidates.map((player) => player.correctGuesses));
-  candidates = candidates.filter((player) => player.correctGuesses === bestCorrectGuesses);
+  const bestCorrectGuesses = Math.max(
+    ...candidates.map((player) => player.correctGuesses),
+  );
+  candidates = candidates.filter(
+    (player) => player.correctGuesses === bestCorrectGuesses,
+  );
   if (candidates.length === 1) {
     return {
       winnerPlayerId: candidates[0].id,
@@ -368,7 +528,8 @@ export function resolveFinalWinner(
     ...candidates.map((player) => player.lastCorrectGuessRound ?? 0),
   );
   candidates = candidates.filter(
-    (player) => (player.lastCorrectGuessRound ?? 0) === latestCorrectGuess,
+    (player) =>
+      (player.lastCorrectGuessRound ?? 0) === latestCorrectGuess,
   );
   if (candidates.length === 1) {
     return {
