@@ -111,6 +111,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
           status="erfolgreich"
           if [[ "$LINK_OUTCOME" != "success" || "$PREVIEW_OUTCOME" != "success" || "$APPLY_OUTCOME" != "success" ]]; then
             status="fehlgeschlagen"
@@ -139,12 +143,13 @@ jobs:
             echo '```'
           } > docs/SUPABASE_DEPLOY_STATUS.md
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
           git add docs/SUPABASE_DEPLOY_STATUS.md
-          git commit -m "[skip ci] Record Supabase deployment status"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "Deploymentstatus ist unverändert."
+          else
+            git commit -m "[skip ci] Record Supabase deployment status"
+            git push origin main
+          fi
 
       - name: Fail unsuccessful deployment
         if: always() && (steps.link.outcome != 'success' || steps.preview.outcome != 'success' || steps.apply.outcome != 'success')
