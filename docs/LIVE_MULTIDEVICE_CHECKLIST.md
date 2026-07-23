@@ -1,0 +1,5 @@
+- invitation code
+- shared lobby
+- realtime player progress
+- mission catalog
+- gold bottle cap
