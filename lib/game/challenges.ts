@@ -273,42 +273,10 @@ export const CHALLENGES: readonly ChallengeDefinition[] = [
       "Langsam bewegen, keine Gelenke verdrehen und sofort stoppen, wenn jemand Schmerzen oder Unwohlsein meldet.",
     original: false,
   },
-  {
-    id: "zeitfenster-neunzig",
-    title: "Zeitfenster 90",
-    publicName: "Objektjagd",
-    category: "teamwork",
-    duration: "15–25 Minuten",
-    material: ["identische Suchlisten", "Handy für Fotos", "Stoppuhr"],
-    playerBriefing:
-      "Findet innerhalb des Zeitfensters möglichst viele Dinge von der Liste. Einige werden als Gegenstand gebracht, andere nur fotografiert. Die Gruppe muss auf jedem Beweisfoto vollständig oder mit der geforderten Personenzahl zu sehen sein.",
-    hostInstructions:
-      "Erstelle eine Liste mit 15 sicheren, legalen und eindeutig prüfbaren Aufgaben. Vermerke, was gebracht und was fotografiert werden soll. Seltene Aufgaben erhalten zwei Punkte, normale einen Punkt. Nach Ablauf zählt nichts mehr.",
-    winCondition:
-      "Das Team mit der höchsten Punktzahl gewinnt. Bei Gleichstand entscheidet die frühere vollständige Rückkehr.",
-    safetyNote:
-      "Keine Pflanzen ausreißen, Tiere anfassen, fremdes Eigentum nehmen, Straßen gefährlich überqueren oder private Bereiche betreten.",
-    original: false,
-  },
-  {
-    id: "morse-der-tiefe",
-    title: "Morse der Tiefe",
-    publicName: "Flüsterstaffel mit Hindernis",
-    category: "teamwork",
-    duration: "12–20 Minuten",
-    material: ["sechs vorbereitete Sätze", "Wendemarkierungen"],
-    playerBriefing:
-      "Die erste Person merkt sich einen Satz, läuft zur nächsten Station und flüstert ihn genau einmal weiter. Jede Person durchläuft anschließend ihre kurze Strecke und gibt weiter. Die letzte Person spricht den Satz laut aus.",
-    hostInstructions:
-      "Nutze gleich lange, ähnlich schwierige Sätze ohne Eigennamen. Wiederholen, Zurücklaufen und Aufschreiben sind verboten. Spiele drei Durchgänge und wechsle die Reihenfolge der Personen.",
-    winCondition:
-      "Ein vollständig korrekter Satz bringt zwei Punkte, ein Satz mit höchstens einem Fehler einen Punkt. Die höchste Gesamtpunktzahl gewinnt.",
-    safetyNote:
-      "Kurze sichere Laufstrecken wählen. Kein Flüstern direkt ins Ohr und ausreichend Abstand halten.",
-    original: false,
-  },
 ] as const;
 
-export function getChallengeById(challengeId?: string): ChallengeDefinition | undefined {
+export function getChallengeById(
+  challengeId?: string,
+): ChallengeDefinition | undefined {
   return CHALLENGES.find((challenge) => challenge.id === challengeId);
 }
