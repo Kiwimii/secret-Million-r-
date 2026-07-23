@@ -75,11 +75,11 @@ begin
     and after_round = completed_round
     and member_id = current_millionaire_id;
 
-  if current_decision = 'keep' then
+  if current_decision::text = 'keep' then
     return current_millionaire_id;
   end if;
 
-  if current_decision in ('release', 'transfer') then
+  if current_decision::text in ('release', 'transfer') then
     -- transfer bleibt nur aus Kompatibilitätsgründen im alten Enum. Eine
     -- Zielperson wird ausdrücklich ignoriert. Der Nachfolger wird ausgelost.
     selected_member_id := public.draw_random_millionaire(
