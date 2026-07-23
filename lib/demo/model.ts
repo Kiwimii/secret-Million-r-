@@ -5,6 +5,8 @@ import type {
   PlayerState,
   RoundNumber,
   RoundOutcome,
+  TeamAssignment,
+  TeamCode,
   VoteStage,
 } from "@/lib/game/types";
 
@@ -18,6 +20,8 @@ export interface RoundVotes {
 export interface DemoAdvantageSelection {
   advantageId: string;
   targetPlayerId?: string;
+  secondaryTargetPlayerId?: string;
+  sourceTargetPlayerId?: string;
   voterPlayerId?: string;
   tieOpponentPlayerId?: string;
 }
@@ -29,6 +33,9 @@ export interface DemoSnapshot {
   runoffCandidateIdsByRound: Partial<Record<RoundNumber, string[]>>;
   missionStatusByRound: Partial<Record<RoundNumber, MissionStatus>>;
   advantageByRound: Partial<Record<RoundNumber, DemoAdvantageSelection>>;
+  challengeIdByRound: Partial<Record<RoundNumber, string>>;
+  teamsByRound: Partial<Record<RoundNumber, TeamAssignment[]>>;
+  challengeWinnerByRound: Partial<Record<RoundNumber, TeamCode>>;
   roleDecisionsByRound: Partial<Record<RoundNumber, Record<string, RoleDecision>>>;
   roleTransferResolvedByRound: Partial<Record<RoundNumber, boolean>>;
   questionerByRound: Partial<Record<RoundNumber, string>>;
@@ -40,13 +47,22 @@ export interface DemoSnapshot {
   updatedAt: string;
 }
 
-const DEMO_PLAYERS = ["Schubi", "Lars", "Danny", "Masl", "Rene", "Gregor", "Felix"] as const;
+const DEMO_PLAYERS = [
+  "Schubi",
+  "Lars",
+  "Danny",
+  "Masl",
+  "Rene",
+  "Gregor",
+  "Felix",
+] as const;
 
 function createPlayer(name: string, index: number): PlayerState {
   return {
     id: `player-${index + 1}`,
     name,
-    attendanceStatus: "present",
+    registrationStatus: "invited",
+    attendanceStatus: "temporarily_absent",
     winnerPoolStatus: "eligible",
     role: "none",
     points: 0,
@@ -83,12 +99,20 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
       3: { advantageId: "r3-two-shadow-votes" },
       4: { advantageId: "r4-redirect" },
     },
+    challengeIdByRound: {
+      1: "operation-umkehrschub",
+      2: "fall-des-weissen-koenigs",
+      3: "protokoll-aquarius",
+      4: "midas-klammer",
+    },
+    teamsByRound: {},
+    challengeWinnerByRound: {},
     roleDecisionsByRound: {},
     roleTransferResolvedByRound: {},
     questionerByRound: {},
     questionTextByRound: {},
     questionAnswerByRound: {},
-    hostMessage: "Lose zuerst den Startmillionär geheim und zufällig aus.",
+    hostMessage: "Registriert eure Profile und lost anschließend die Teams und den Startmillionär aus.",
     updatedAt: new Date().toISOString(),
   };
 }
@@ -102,6 +126,9 @@ export function isDemoSnapshot(value: unknown): value is DemoSnapshot {
       candidate.votesByRound &&
       candidate.voteStageByRound &&
       candidate.advantageByRound &&
+      candidate.challengeIdByRound &&
+      candidate.teamsByRound &&
+      candidate.challengeWinnerByRound &&
       candidate.roleDecisionsByRound,
   );
 }

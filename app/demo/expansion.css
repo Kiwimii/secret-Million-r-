@@ -1,0 +1,641 @@
+.registration-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+}
+
+.registration-card {
+  padding: 34px;
+}
+
+.registration-card h2 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1;
+}
+
+.registration-form {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 26px;
+  margin-top: 24px;
+}
+
+.registration-avatar-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  text-align: center;
+}
+
+.registration-avatar-column small {
+  color: #7f8a8c;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+
+.registration-avatar-preview,
+.player-profile-avatar {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(240, 215, 122, .25);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(240, 215, 122, .18), transparent 45%),
+    rgba(255, 255, 255, .04);
+}
+
+.registration-avatar-preview {
+  display: grid;
+  place-items: center;
+  width: 156px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  color: #f0d77a;
+  font: 500 4rem Georgia, serif;
+}
+
+.registration-avatar-preview img,
+.player-profile-avatar img,
+.lobby-avatar-wrap img,
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-upload-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 12px;
+  color: #dce2e2;
+  background: rgba(255, 255, 255, .04);
+  cursor: pointer;
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.profile-upload-button:hover {
+  border-color: #d4af37;
+}
+
+.profile-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.registration-fields {
+  min-width: 0;
+}
+
+.registration-fields input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 13px;
+  color: #f5f1e6;
+  background: rgba(0, 0, 0, .24);
+  outline: none;
+}
+
+.registration-fields input:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, .12);
+}
+
+.registration-fields .button {
+  margin-top: 18px;
+}
+
+.registration-error {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(214, 106, 95, .35);
+  border-radius: 12px;
+  color: #efc0ba;
+  background: rgba(214, 106, 95, .09);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.portal-access-card {
+  min-height: auto;
+}
+
+.portal-access-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.lobby-overview {
+  margin-top: 20px;
+  padding: 28px;
+}
+
+.lobby-overview.compact {
+  margin: 0 0 18px;
+  padding: 22px;
+}
+
+.lobby-heading {
+  align-items: center;
+}
+
+.lobby-challenge-summary {
+  min-width: 230px;
+  padding: 13px 15px;
+  border: 1px solid rgba(240, 215, 122, .15);
+  border-radius: 14px;
+  background: rgba(212, 175, 55, .045);
+}
+
+.lobby-challenge-summary small,
+.lobby-challenge-summary strong,
+.lobby-challenge-summary span {
+  display: block;
+}
+
+.lobby-challenge-summary small {
+  color: #7f8a8c;
+  font-size: .66rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.lobby-challenge-summary strong {
+  margin-top: 5px;
+  color: #f0d77a;
+}
+
+.lobby-challenge-summary span {
+  margin-top: 3px;
+  color: #9da8aa;
+  font-size: .72rem;
+}
+
+.lobby-player-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.lobby-player-card {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .075);
+  border-radius: 15px;
+  background: rgba(0, 0, 0, .14);
+}
+
+.lobby-player-card.current {
+  border-color: rgba(240, 215, 122, .45);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, .07);
+}
+
+.lobby-player-card.invited {
+  opacity: .62;
+}
+
+.lobby-avatar-wrap {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(240, 215, 122, .17);
+  border-radius: 50%;
+  color: #f0d77a;
+  font-weight: 850;
+  background: rgba(212, 175, 55, .09);
+}
+
+.lobby-player-meta {
+  min-width: 0;
+}
+
+.lobby-player-meta > strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-player-meta .demo-status {
+  margin-top: 5px;
+}
+
+.lobby-team {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  min-height: 31px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: .68rem;
+}
+
+.lobby-team strong {
+  font-size: .62rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.team-azur {
+  color: #b8e9f1;
+  background: rgba(58, 153, 174, .13);
+}
+
+.team-gold {
+  color: #f0d77a;
+  background: rgba(212, 175, 55, .12);
+}
+
+.team-none {
+  color: #7f8a8c;
+  background: rgba(255, 255, 255, .035);
+}
+
+.lobby-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 16px;
+  color: #7f8a8c;
+  font-size: .7rem;
+}
+
+.lobby-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.team-dot {
+  display: inline-block;
+  width: 8px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.team-dot.azur {
+  background: #58bfd2;
+  box-shadow: 0 0 10px rgba(88, 191, 210, .7);
+}
+
+.team-dot.gold {
+  background: #d4af37;
+  box-shadow: 0 0 10px rgba(212, 175, 55, .65);
+}
+
+.status-invited {
+  color: #b4bec0;
+  background: rgba(255, 255, 255, .06);
+}
+
+.profile-avatar {
+  padding: 0;
+  overflow: hidden;
+}
+
+.challenge-control-card,
+.advantage-control-card {
+  border-color: rgba(240, 215, 122, .15);
+}
+
+.challenge-detail-stack,
+.advantage-description-stack {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.challenge-detail-stack > div,
+.advantage-description-stack > div {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .14);
+}
+
+.challenge-detail-stack strong,
+.advantage-description-stack strong {
+  display: block;
+  color: #f0d77a;
+  font-size: .75rem;
+}
+
+.challenge-detail-stack p,
+.advantage-description-stack p {
+  margin: 6px 0 0;
+  color: #a6b0b2;
+  font-size: .78rem;
+  line-height: 1.55;
+}
+
+.challenge-detail-stack ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  color: #a6b0b2;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+.challenge-meta-grid {
+  display: grid;
+  grid-template-columns: .65fr 1.35fr;
+  gap: 8px;
+}
+
+.challenge-meta-grid span,
+.challenge-meta-grid small {
+  display: block;
+}
+
+.challenge-meta-grid span {
+  color: #c9d0d1;
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.challenge-meta-grid small {
+  margin-bottom: 4px;
+  color: #7f8a8c;
+  font-size: .62rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.challenge-safety,
+.advantage-limit {
+  border-color: rgba(214, 106, 95, .22) !important;
+  color: #e6c0bb;
+  background: rgba(214, 106, 95, .07) !important;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+.challenge-control-card > .button {
+  margin-top: 4px;
+}
+
+.host-team-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.host-team-card {
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.host-team-card > strong {
+  font: 500 1.05rem Georgia, serif;
+}
+
+.host-team-card ul {
+  min-height: 48px;
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.host-team-card button {
+  width: 100%;
+  min-height: 37px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 10px;
+  color: inherit;
+  background: rgba(0, 0, 0, .14);
+  cursor: pointer;
+  font-size: .67rem;
+}
+
+.host-team-card button.active {
+  color: #071113;
+  background: #72b59a;
+  border-color: #72b59a;
+}
+
+.player-profile-top {
+  align-items: center;
+}
+
+.player-profile-heading {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  min-width: 0;
+}
+
+.player-profile-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 94px;
+  aspect-ratio: 1;
+  color: #f0d77a;
+  font: 500 2.7rem Georgia, serif;
+}
+
+.player-team-banner {
+  display: grid;
+  grid-template-columns: .7fr 1.3fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 15px 18px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.player-team-banner small,
+.player-team-banner strong {
+  display: block;
+}
+
+.player-team-banner small {
+  color: #7f8a8c;
+  font-size: .64rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.player-team-banner strong {
+  margin-top: 4px;
+}
+
+.player-team-banner > span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #aab3b5;
+  background: rgba(255, 255, 255, .05);
+  font-size: .7rem;
+}
+
+.player-team-banner > span.winner {
+  color: #c8eadc;
+  background: rgba(114, 181, 154, .13);
+}
+
+.team-text-azur {
+  color: #8cd8e6;
+}
+
+.team-text-gold {
+  color: #f0d77a;
+}
+
+.team-text-none {
+  color: #8b9698;
+}
+
+.demo-challenge-card,
+.demo-advantage-player-card {
+  grid-column: 2;
+}
+
+.demo-challenge-card p,
+.demo-advantage-player-card p {
+  color: #9da8aa;
+  line-height: 1.62;
+}
+
+.challenge-public-name {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #b8e9f1;
+  background: rgba(58, 153, 174, .12);
+  font-size: .68rem;
+}
+
+.demo-challenge-card dl {
+  display: grid;
+  gap: 9px;
+  margin: 18px 0 0;
+}
+
+.demo-challenge-card dl > div {
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 11px;
+  background: rgba(0, 0, 0, .14);
+}
+
+.demo-challenge-card dt {
+  color: #f0d77a;
+  font-size: .66rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+
+.demo-challenge-card dd {
+  margin: 5px 0 0;
+  color: #a6b0b2;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+.advantage-player-limit {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid rgba(240, 215, 122, .16);
+  border-radius: 11px;
+  color: #d9d0a7;
+  background: rgba(212, 175, 55, .055);
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 1160px) {
+  .lobby-player-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .registration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-player-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .demo-challenge-card,
+  .demo-advantage-player-card {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 680px) {
+  .registration-card {
+    padding: 22px;
+  }
+
+  .registration-form {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-avatar-preview {
+    width: 132px;
+  }
+
+  .portal-access-actions,
+  .host-team-grid,
+  .challenge-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-overview,
+  .lobby-overview.compact {
+    padding: 18px;
+  }
+
+  .lobby-heading {
+    display: block;
+  }
+
+  .lobby-challenge-summary {
+    min-width: 0;
+    margin-top: 12px;
+  }
+
+  .lobby-player-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .player-profile-heading {
+    align-items: flex-start;
+  }
+
+  .player-profile-avatar {
+    width: 68px;
+    font-size: 2rem;
+  }
+
+  .player-team-banner {
+    grid-template-columns: 1fr;
+  }
+}

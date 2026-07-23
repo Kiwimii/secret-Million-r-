@@ -1,1 +1,1 @@
-export { default } from "./PlayerFinalSecure";
+export { default } from "./PlayerFinalLobby";
