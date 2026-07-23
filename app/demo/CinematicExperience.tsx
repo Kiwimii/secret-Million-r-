@@ -39,7 +39,7 @@ export function CinematicIntro({
       <div className="cinematic-intro-shell">
         <div className="cinematic-intro-topline">
           <span>SECRET MILLIONÄR</span>
-          <button type="button" onClick={onSkip}>Intro überspringen</button>
+          <button type="button" onClick={onSkip}>Vorspann überspringen · auf eigenes Risiko</button>
         </div>
 
         <div className={`cinematic-slide ${moving ? "leaving" : "entering"}`}>
@@ -67,15 +67,15 @@ export function CinematicIntro({
           </div>
           {!last ? (
             <button className="button button-primary" type="button" onClick={advance}>
-              Weiter
+              Weiter ins Misstrauen
             </button>
           ) : (
             <div className="cinematic-entry-actions">
               <button className="button button-primary" type="button" onClick={onPlayer}>
-                Als Spieler beginnen
+                Als Spieler verdächtig werden
               </button>
               <button className="button button-secondary" type="button" onClick={onHost}>
-                Spielleitung einrichten
+                Verantwortung als Spielleitung übernehmen
               </button>
             </div>
           )}
@@ -130,7 +130,7 @@ export function RoleTutorial({
                 else setIndex((current) => current + 1);
               }}
             >
-              {last ? "Zugang öffnen" : "Weiter"}
+              {last ? "Zugang öffnen · Unschuld nicht garantiert" : "Weiter, wir sind noch höflich"}
             </button>
           </div>
         </div>
