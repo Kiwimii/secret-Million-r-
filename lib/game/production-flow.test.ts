@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { getNextGameStep } from "./flow";
-import { getHostGuide } from "./host-guide";
+import { getHostGuide, type HostGuideContext } from "./host-guide";
 import type { GameState, PlayerState } from "./types";
 
 function player(id: string): PlayerState {
   return {
     id,
     name: id,
+    registrationStatus: "registered",
     attendanceStatus: "present",
     winnerPoolStatus: "eligible",
     role: id === "p1" ? "millionaire" : "investigator",
@@ -15,7 +16,10 @@ function player(id: string): PlayerState {
   };
 }
 
-function state(round: 1 | 2 | 3 | 4, phase: GameState["phase"]): GameState {
+function state(
+  round: 1 | 2 | 3 | 4,
+  phase: GameState["phase"],
+): GameState {
   return {
     id: "game",
     currentRound: round,
@@ -24,6 +28,31 @@ function state(round: 1 | 2 | 3 | 4, phase: GameState["phase"]): GameState {
     revision: 1,
     roundOutcomes: [],
     players: [player("p1"), player("p2")],
+  };
+}
+
+function guideContext(
+  overrides: Partial<HostGuideContext>,
+): HostGuideContext {
+  return {
+    round: 1,
+    phase: "lobby",
+    hasMillionaire: true,
+    registeredPlayers: 7,
+    invitedPlayers: 0,
+    missionStatus: "assigned",
+    voteStage: "main",
+    submittedVotes: 0,
+    requiredVotes: 7,
+    roleDecisionsSubmitted: 0,
+    roleDecisionsRequired: 7,
+    roleTransferResolved: false,
+    hasQuestioner: false,
+    hasQuestion: false,
+    hasChallenge: true,
+    teamAssignments: 7,
+    hasChallengeWinner: false,
+    ...overrides,
   };
 }
 
@@ -60,20 +89,20 @@ describe("rundenabhängiger Missionsschluss", () => {
 
 describe("Spielleiteranweisungen", () => {
   it("erklärt bei Korkenabgabe die zufällige Nachfolge", () => {
-    const guide = getHostGuide({
-      round: 2,
-      phase: "role_transfer",
-      hasMillionaire: true,
-      missionStatus: "completed",
-      voteStage: "main",
-      submittedVotes: 5,
-      requiredVotes: 5,
-      roleDecisionsSubmitted: 5,
-      roleDecisionsRequired: 5,
-      roleTransferResolved: false,
-      hasQuestioner: true,
-      hasQuestion: true,
-    });
+    const guide = getHostGuide(
+      guideContext({
+        round: 2,
+        phase: "role_transfer",
+        missionStatus: "completed",
+        submittedVotes: 5,
+        requiredVotes: 5,
+        roleDecisionsSubmitted: 5,
+        roleDecisionsRequired: 5,
+        hasQuestioner: true,
+        hasQuestion: true,
+        hasChallengeWinner: true,
+      }),
+    );
 
     expect(guide.checklist.join(" ")).toContain("zufällig");
     expect(guide.checklist.join(" ")).toContain("bisherigen Millionär");
@@ -81,20 +110,13 @@ describe("Spielleiteranweisungen", () => {
   });
 
   it("blockiert den Missionsschritt solange die Mission nicht ausgegeben ist", () => {
-    const guide = getHostGuide({
-      round: 1,
-      phase: "mission",
-      hasMillionaire: true,
-      missionStatus: "unassigned",
-      voteStage: "main",
-      submittedVotes: 0,
-      requiredVotes: 7,
-      roleDecisionsSubmitted: 0,
-      roleDecisionsRequired: 7,
-      roleTransferResolved: false,
-      hasQuestioner: false,
-      hasQuestion: false,
-    });
+    const guide = getHostGuide(
+      guideContext({
+        round: 1,
+        phase: "mission",
+        missionStatus: "unassigned",
+      }),
+    );
 
     expect(guide.blockedReason).toContain("Mission");
     expect(guide.clickEffect).toContain("Challenge");
