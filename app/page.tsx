@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const rounds = [
   ["01", "Operation Umkehrschub", "Freitagabend"],
   ["02", "Der Fall des weißen Königs", "Samstagmorgen"],
@@ -17,19 +19,27 @@ export default function HomePage() {
         </nav>
 
         <div className="hero-content">
-          <p className="kicker">Einer trägt das Vermögen. Alle anderen jagen ihn.</p>
+          <p className="kicker">
+            Einer trägt das Vermögen. Alle anderen jagen ihn.
+          </p>
           <h1>
             Secret <span>Millionär</span>
           </h1>
           <p className="lead">
-            Vier Runden. Geheime Rollen. Verdeckte Missionen. Eine falsche Anschuldigung reicht,
-            um aus dem Gewinnerpool zu fliegen.
+            Vier Runden. Geheime Rollen. Verdeckte Missionen. Eine falsche
+            Anschuldigung reicht, um aus dem Gewinnerpool zu fliegen.
           </p>
 
           <div className="actions">
-            <a className="button button-primary" href="/demo">Browser-Test starten</a>
-            <a className="button button-secondary" href="/join">Spiel beitreten</a>
-            <a className="button button-secondary" href="/admin">Spielleitung öffnen</a>
+            <Link className="button button-primary" href="/demo">
+              Browser-Test starten
+            </Link>
+            <Link className="button button-secondary" href="/join">
+              Spiel beitreten
+            </Link>
+            <Link className="button button-secondary" href="/admin">
+              Spielleitung öffnen
+            </Link>
           </div>
         </div>
 
@@ -44,8 +54,9 @@ export default function HomePage() {
           <h2>Das Wochenende folgt einem kontrollierten Ablauf.</h2>
         </div>
         <p>
-          Der Spielleiter gibt jede Phase manuell frei. Rollen, Missionen, Vorteile, Stimmen und
-          Punktestände bleiben getrennt und werden nur den berechtigten Personen angezeigt.
+          Der Spielleiter gibt jede Phase manuell frei. Rollen, Missionen,
+          Vorteile, Stimmen und Punktestände bleiben getrennt und werden nur
+          den berechtigten Personen angezeigt.
         </p>
       </section>
 
