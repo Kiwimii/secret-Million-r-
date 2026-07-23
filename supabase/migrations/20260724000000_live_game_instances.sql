@@ -541,7 +541,7 @@ returns table (
   vote_submitted boolean,
   role_decision_submitted boolean,
   last_seen_at timestamptz,
-  current_role public.game_role
+  "current_role" public.game_role
 )
 language plpgsql
 stable
