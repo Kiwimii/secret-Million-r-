@@ -1,4 +1,5 @@
 name: Verify live release
+# This workflow intentionally verifies the public page and live Supabase RPCs.
 
 on:
   push:
