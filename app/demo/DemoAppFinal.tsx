@@ -1,1 +1,1 @@
-export { default } from "./DemoAppFinalSecure";
+export { default } from "./DemoAppCinematic";
