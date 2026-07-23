@@ -46,7 +46,9 @@ set search_path = public
 as $$
 declare
   selected_member_id uuid;
-  selected_round smallint;
+  current_round_number smallint;
+  role_round_number smallint;
+  current_phase public.game_phase;
   new_revision bigint;
 begin
   if not public.is_game_host(target_game_id) then
@@ -55,14 +57,30 @@ begin
   end if;
 
   -- Serialisiert parallele Auslosungsversuche für dieselbe Partie.
-  select current_round
-    into selected_round
+  select current_round, phase
+    into current_round_number, current_phase
   from public.games
   where id = target_game_id
   for update;
 
-  if selected_round is null then
+  if current_round_number is null then
     raise exception 'Spiel nicht gefunden.';
+  end if;
+
+  if current_phase in ('result', 'finished') then
+    raise exception 'In dieser Phase ist keine direkte Auslosung zulässig. Nutze die Rollenentscheidung.';
+  end if;
+
+  -- In der Rollenentscheidungsphase wird bereits die Rolle der folgenden
+  -- Runde vorbereitet. In allen anderen Phasen ersetzt die Ziehung den
+  -- Millionär der laufenden Runde, etwa bei einer vorzeitigen Abreise.
+  role_round_number := case
+    when current_phase = 'role_transfer' then current_round_number + 1
+    else current_round_number
+  end;
+
+  if role_round_number not between 1 and 4 then
+    raise exception 'Für diese Partie existiert keine weitere Runde.';
   end if;
 
   select gm.id
@@ -80,12 +98,12 @@ begin
     raise exception 'Kein zulässiger Kandidat für die Millionärsrolle vorhanden.';
   end if;
 
-  -- Zuerst alle aktiven Rollen neutralisieren. So kann der partielle Unique-
-  -- Index niemals vorübergehend zwei Millionäre sehen.
+  -- Zuerst alle Rollen der Zielrunde neutralisieren. So kann der partielle
+  -- Unique-Index niemals vorübergehend zwei Millionäre sehen.
   insert into public.round_roles (game_id, round_number, member_id, role)
   select
     gm.game_id,
-    selected_round,
+    role_round_number,
     gm.id,
     case
       when gm.winner_pool_status = 'eligible' and gm.attendance_status = 'present'
@@ -100,7 +118,7 @@ begin
   update public.round_roles
   set role = 'millionaire'
   where game_id = target_game_id
-    and round_number = selected_round
+    and round_number = role_round_number
     and member_id = selected_member_id;
 
   update public.games
@@ -120,7 +138,8 @@ begin
     auth.uid(),
     'millionaire_randomly_drawn',
     jsonb_build_object(
-      'round', selected_round,
+      'round', role_round_number,
+      'source_phase', current_phase,
       'selected_member_id', selected_member_id,
       'excluded_member_id', excluded_member_id
     ),
@@ -135,4 +154,4 @@ revoke all on function public.draw_random_millionaire(uuid, uuid) from public;
 grant execute on function public.draw_random_millionaire(uuid, uuid) to authenticated;
 
 comment on function public.draw_random_millionaire(uuid, uuid) is
-  'Host-only Zufallsauslosung. Bei Korkenabgabe wird der bisherige Millionär als excluded_member_id ausgeschlossen.';
+  'Host-only Zufallsauslosung. Bei Korkenabgabe wird der bisherige Millionär ausgeschlossen; die Rolle wird für die korrekte Zielrunde gespeichert.';
