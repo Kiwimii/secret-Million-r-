@@ -64,6 +64,18 @@ jobs:
           PY
           grep -n '"current_role" public.game_role' "$migration"
 
+      - name: Persist normalized migration source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- supabase/migrations/20260724000000_live_game_instances.sql; then
+            git add supabase/migrations/20260724000000_live_game_instances.sql
+            git commit -m "[skip ci] Quote reserved live progress column"
+            git push origin main
+          fi
+
       - name: Link remote project
         id: link
         continue-on-error: true
@@ -130,8 +142,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
-          git add docs/SUPABASE_DEPLOY_STATUS.md supabase/migrations/20260724000000_live_game_instances.sql
-          git commit -m "[skip ci] Record Supabase deployment status and SQL normalization"
+          git add docs/SUPABASE_DEPLOY_STATUS.md
+          git commit -m "[skip ci] Record Supabase deployment status"
           git push origin main
 
       - name: Fail unsuccessful deployment
