@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-static";
+
 const basePath =
   process.env.GITHUB_PAGES === "true" ? "/secret-Million-r-" : "";
 
