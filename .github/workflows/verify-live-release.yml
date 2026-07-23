@@ -33,6 +33,8 @@ jobs:
         run: npm install
 
       - name: Resolve browser configuration
+        id: config
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -66,8 +68,13 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
       - name: Wait for live database RPCs
+        id: backend
+        continue-on-error: true
         shell: bash
         run: |
+          set -euo pipefail
+          test -n "${NEXT_PUBLIC_SUPABASE_URL:-}"
+          test -n "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}"
           node <<'NODE'
           const { createClient } = require('@supabase/supabase-js');
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -104,6 +111,8 @@ jobs:
           NODE
 
       - name: Wait for public game page
+        id: page
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -118,26 +127,39 @@ jobs:
           done
           exit 1
 
-      - name: Record verified release
+      - name: Record release verification
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          PAGE_OUTCOME: ${{ steps.page.outcome }}
         shell: bash
         run: |
           set -euo pipefail
           verified_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          overall="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$BACKEND_OUTCOME" != "success" || "$PAGE_OUTCOME" != "success" ]]; then
+            overall="fehlgeschlagen"
+          fi
           {
-            echo "# Live-Release verifiziert"
+            echo "# Live-Release-Prüfung"
             echo
-            echo "- Status: erfolgreich"
+            echo "- Status: $overall"
             echo "- Zeitpunkt (UTC): $verified_at"
             echo "- Commit: $GITHUB_SHA"
             echo "- Öffentliche Seite: $LIVE_URL"
-            echo "- Supabase Anonymous Auth: erreichbar"
-            echo "- Live-RPC lookup_live_game: erreichbar"
-            echo "- GitHub Pages: HTTP-Erfolg"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Supabase Anonymous Auth und Live-RPC: $BACKEND_OUTCOME"
+            echo "- GitHub Pages HTTP-Prüfung: $PAGE_OUTCOME"
           } > docs/LIVE_RELEASE_STATUS.md
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
           git add docs/LIVE_RELEASE_STATUS.md
-          git commit -m "[skip ci] Verify live Secret Millionär release"
+          git commit -m "[skip ci] Record live Secret Millionär release status"
           git push origin main
+
+      - name: Fail unsuccessful release verification
+        if: always() && (steps.config.outcome != 'success' || steps.backend.outcome != 'success' || steps.page.outcome != 'success')
+        run: exit 1
