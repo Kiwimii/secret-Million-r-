@@ -1,19 +1,23 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+const basePath =
+  process.env.GITHUB_PAGES === "true" ? "/secret-Million-r-" : "";
+
 export const metadata: Metadata = {
   title: "Secret Millionär – Blaue Adria",
-  description: "Das moderierte Echtzeitspiel für das Wochenende an der Blauen Adria.",
+  description:
+    "Das moderierte Echtzeitspiel für das Wochenende an der Blauen Adria.",
   applicationName: "Secret Millionär",
-  manifest: "/manifest.webmanifest",
+  manifest: `${basePath}/manifest.webmanifest`,
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Secret Millionär",
   },
   icons: {
-    icon: "/secret-millionaer-icon.svg",
-    apple: "/secret-millionaer-icon.svg",
+    icon: `${basePath}/secret-millionaer-icon.svg`,
+    apple: `${basePath}/secret-millionaer-icon.svg`,
   },
 };
 
@@ -25,7 +29,9 @@ export const viewport: Viewport = {
   themeColor: "#071113",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="de">
       <body>{children}</body>
