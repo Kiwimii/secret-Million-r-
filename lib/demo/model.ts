@@ -62,7 +62,7 @@ function createPlayer(name: string, index: number): PlayerState {
     id: `player-${index + 1}`,
     name,
     registrationStatus: "invited",
-    attendanceStatus: "present",
+    attendanceStatus: "temporarily_absent",
     winnerPoolStatus: "eligible",
     role: "none",
     points: 0,
