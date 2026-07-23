@@ -20,6 +20,8 @@ declare
   current_decision public.role_decision_type;
   missing_count integer;
   selected_member_id uuid;
+  next_round smallint;
+  new_revision bigint;
 begin
   if not public.is_game_host(target_game_id) then
     raise exception 'Nur die Spielleitung darf die Rollenentscheidung auflösen.'
@@ -29,6 +31,8 @@ begin
   if completed_round not between 1 and 3 then
     raise exception 'Eine Rollenentscheidung ist nur nach Runde 1 bis 3 zulässig.';
   end if;
+
+  next_round := completed_round + 1;
 
   select millionaire_member_id
     into current_millionaire_id
@@ -76,6 +80,48 @@ begin
     and member_id = current_millionaire_id;
 
   if current_decision::text = 'keep' then
+    -- Auch beim Behalten wird für die folgende Runde ein vollständiger,
+    -- eigener Rollensatz angelegt. Die alte Rundenhistorie bleibt unverändert.
+    insert into public.round_roles (game_id, round_number, member_id, role)
+    select
+      gm.game_id,
+      next_round,
+      gm.id,
+      case
+        when gm.id = current_millionaire_id
+          then 'millionaire'::public.game_role
+        when gm.winner_pool_status = 'eligible' and gm.attendance_status = 'present'
+          then 'investigator'::public.game_role
+        else 'none'::public.game_role
+      end
+    from public.game_members gm
+    where gm.game_id = target_game_id
+    on conflict (game_id, round_number, member_id)
+    do update set role = excluded.role;
+
+    update public.games
+    set revision = revision + 1
+    where id = target_game_id
+    returning revision into new_revision;
+
+    insert into public.game_events (
+      game_id,
+      actor_user_id,
+      event_type,
+      payload,
+      revision
+    ) values (
+      target_game_id,
+      auth.uid(),
+      'millionaire_kept_cork',
+      jsonb_build_object(
+        'completed_round', completed_round,
+        'next_round', next_round,
+        'millionaire_member_id', current_millionaire_id
+      ),
+      new_revision
+    );
+
     return current_millionaire_id;
   end if;
 
