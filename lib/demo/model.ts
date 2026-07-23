@@ -26,6 +26,7 @@ export interface DemoAdvantageSelection {
 }
 
 export interface DemoSnapshot {
+  schemaVersion: 2;
   game: GameState;
   votesByRound: Partial<Record<RoundNumber, RoundVotes>>;
   voteStageByRound: Partial<Record<RoundNumber, VoteStage>>;
@@ -52,6 +53,7 @@ export function emptyRoundVotes(): RoundVotes {
 
 export function createInitialDemoSnapshot(): DemoSnapshot {
   return {
+    schemaVersion: 2,
     game: {
       id: "blaue-adria-demo",
       currentRound: 1,
@@ -98,7 +100,8 @@ export function isDemoSnapshot(value: unknown): value is DemoSnapshot {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<DemoSnapshot>;
   return Boolean(
-    candidate.game &&
+    candidate.schemaVersion === 2 &&
+      candidate.game &&
       Array.isArray(candidate.game.players) &&
       candidate.votesByRound &&
       candidate.voteStageByRound &&
