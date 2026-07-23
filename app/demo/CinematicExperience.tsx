@@ -6,6 +6,7 @@ import type {
   OnboardingSlide,
   TransitionCue,
 } from "@/lib/demo/onboarding";
+import GoldCrownCap from "./GoldCrownCap";
 
 function SceneVisual({
   visual,
@@ -23,7 +24,9 @@ function SceneVisual({
       <div className="scene-content">
         {visual === "cork-orbit" && (
           <>
-            <div className="scene-cork"><span>€</span></div>
+            <div className="scene-cork scene-gold-cap">
+              <GoldCrownCap size={compact ? "medium" : "large"} />
+            </div>
             <i className="orbit orbit-a" />
             <i className="orbit orbit-b" />
             <i className="orbit orbit-c" />
@@ -33,43 +36,55 @@ function SceneVisual({
           <>
             <div className="lineup-lines" />
             {[1, 2, 3, 4, 5].map((item) => (
-              <span className={`suspect suspect-${item}`} key={item}><i /></span>
+              <span className={`suspect suspect-${item}`} key={item}>
+                <i />
+              </span>
             ))}
             <b className="lineup-flash">VERDÄCHTIG</b>
           </>
         )}
         {visual === "pin-vault" && (
           <>
-            <div className="vault-door"><span>••••</span><i /><i /><i /></div>
+            <div className="vault-door">
+              <span>••••</span><i /><i /><i />
+            </div>
             <div className="vault-lock">PIN</div>
           </>
         )}
         {visual === "host-console" && (
           <>
-            <div className="console-panel"><span /><span /><span /><span /><span /><span /></div>
+            <div className="console-panel">
+              <span /><span /><span /><span /><span /><span />
+            </div>
             <div className="console-wave"><i /></div>
             <b className="console-label">REGIE</b>
           </>
         )}
         {visual === "lobby-grid" && (
           <div className="lobby-mini-grid">
-            {[1, 2, 3, 4, 5, 6].map((item) => <span key={item}><i />P{item}</span>)}
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <span key={item}><i />P{item}</span>
+            ))}
           </div>
         )}
         {visual === "role-card" && (
           <>
             <div className="role-card-stack">
               <span className="role-card-back" />
-              <span className="role-card-front">?</span>
+              <span className="role-card-front">♛</span>
             </div>
             <i className="role-glint" />
           </>
         )}
         {visual === "team-split" && (
           <>
-            <div className="team-column team-column-azur"><strong>AZUR</strong><span /><span /><span /></div>
+            <div className="team-column team-column-azur">
+              <strong>AZUR</strong><span /><span /><span />
+            </div>
             <div className="team-divider">VS</div>
-            <div className="team-column team-column-gold"><strong>GOLD</strong><span /><span /><span /></div>
+            <div className="team-column team-column-gold">
+              <strong>GOLD</strong><span /><span /><span />
+            </div>
           </>
         )}
         {visual === "ballot-box" && (
@@ -81,7 +96,7 @@ function SceneVisual({
         {visual === "mission-envelope" && (
           <>
             <div className="mission-envelope"><span>SM</span><i /></div>
-            <div className="mission-seal">€</div>
+            <div className="mission-seal">♛</div>
           </>
         )}
         {visual === "challenge-course" && (
@@ -115,7 +130,9 @@ function SceneVisual({
           </>
         )}
         {visual === "advantage-cards" && (
-          <div className="advantage-card-fan"><span>+1</span><span>×2</span><span>↻</span><span>Ø</span></div>
+          <div className="advantage-card-fan">
+            <span>+1</span><span>×2</span><span>↻</span><span>Ø</span>
+          </div>
         )}
         {visual === "evaluation-counter" && (
           <>
@@ -133,7 +150,7 @@ function SceneVisual({
           <>
             <div className="roulette-wheel">
               {[1, 2, 3, 4, 5, 6].map((item) => <i key={item} />)}
-              <span>€</span>
+              <span>♛</span>
             </div>
             <b className="roulette-pointer">▼</b>
           </>
@@ -217,10 +234,10 @@ export function CinematicIntro({
           ) : (
             <div className="cinematic-entry-actions">
               <button className="button button-primary" type="button" onClick={onPlayer}>
-                Als Spieler verdächtig werden
+                Einem Spiel beitreten
               </button>
               <button className="button button-secondary" type="button" onClick={onHost}>
-                Als Spielleitung Verantwortung simulieren
+                Als Spielleitung eine Partie erstellen
               </button>
             </div>
           )}

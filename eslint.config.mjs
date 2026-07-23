@@ -6,10 +6,11 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   {
-    files: ["app/demo/**/*.tsx", "lib/demo/**/*.ts"],
+    files: ["app/demo/**/*.tsx", "lib/demo/**/*.ts", "lib/live/**/*.ts"],
     rules: {
-      // Die Testversion synchronisiert ihren Zustand bewusst beim Mounten mit
-      // localStorage/sessionStorage. Produktiv wird dies durch Supabase ersetzt.
+      // Demo- und Live-Clients hydrieren beim Mounten bewusst Zustand aus
+      // Browser-Speicher, Auth und Realtime. Weitere Updates erfolgen über
+      // externe Supabase-Callbacks und Presence-Ereignisse.
       "react-hooks/set-state-in-effect": "off",
     },
   },
