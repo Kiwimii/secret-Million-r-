@@ -111,6 +111,9 @@ export interface MissionDefinition {
   task: string;
   successCriteria: string;
   timeWindow: string;
+  hostInstructions?: string;
+  difficulty?: "leicht" | "mittel" | "riskant";
+  suitablePhases?: string;
   round?: RoundNumber;
   reserve: boolean;
 }
