@@ -1,9 +1,9 @@
 # Live-Release-Prüfung
 
-- Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T03:32:58Z
-- Commit: 52d0e34b9d44807fe3b1a5c74c53a599778c894c
+- Status: fehlgeschlagen
+- Zeitpunkt (UTC): 2026-07-24T03:42:48Z
+- Commit: 2725f45ca55f1ad109e37de0a3472c392907640a
 - Öffentliche Seite: https://kiwimii.github.io/secret-Million-r-/demo/
 - Browser-Konfiguration: success
-- Supabase Anonymous Auth und Live-RPC: success
-- GitHub Pages HTTP-Prüfung: success
+- Vollständiger Live-Partie-Smoke-Test: cancelled
+- GitHub Pages HTTP-Prüfung: skipped
