@@ -1,7 +1,9 @@
-# Visual-Experience-V3-Prüfung
+# Visual-Experience-V4-Prüfung
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T11:58:29Z
-- Commit: 48e162e745ce7e209e847ec896a49d99fd8b7b24
+- Zeitpunkt (UTC): 2026-07-24T12:01:39Z
+- Commit: 553aee2fb00f0f5b1ec3da1d10dd62180a967185
 - Öffentliche Seite: https://kiwimii.github.io/secret-Million-r-/demo/
-- V3-Kennung und verbindlicher Live-Ablauf im HTML: success
+- V3-Design und verbindlicher Live-Ablauf: success
+- Wiederhergestellter Kernablauf im HTML: success
+- Profil-Wiedereintritt im HTML: success
