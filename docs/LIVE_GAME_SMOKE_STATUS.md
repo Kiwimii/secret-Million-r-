@@ -1,7 +1,7 @@
 # Live-Partie-Smoke-Test
 
 - Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-07-24T07:24:54Z
+- Zeitpunkt (UTC): 2026-07-24T07:25:22Z
 - Commit: 4e8d1bc6e2d8ae0d4a96e201d057317309858933
 - Browser-Konfiguration: success
 - Partie, PINs sowie Mission- und Challenge-Auswahl: failure
