@@ -1,0 +1,293 @@
+name: Verify restored core game flow
+
+on:
+  workflow_run:
+    workflows: ["Deploy Supabase Database"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-restored-core-game-flow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-restored-core-game-flow
+  cancel-in-progress: true
+
+jobs:
+  verify-core-flow:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve Supabase browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Verify advantages, elimination, public result and cork decision
+        id: core
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE' 2>&1 | tee core-game-flow.log
+          const { createClient } = require('@supabase/supabase-js');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const makeClient = () => createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false } },
+          );
+
+          async function auth(client) {
+            const response = await client.auth.signInAnonymously();
+            if (response.error || !response.data.user) throw response.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+
+          async function rpc(client, name, args) {
+            const response = await client.rpc(name, args);
+            if (response.error) throw new Error(`${name}: ${response.error.message}`);
+            return response.data;
+          }
+
+          async function cleanup(host, gameId) {
+            await rpc(host, 'delete_own_live_game', { target_game_id: gameId });
+          }
+
+          function tallyMap(result) {
+            return new Map((result?.tally ?? []).map((entry) => [entry.memberId, Number(entry.totalVotes)]));
+          }
+
+          async function runScenario(effect, index) {
+            const host = makeClient();
+            const playerClients = Array.from({ length: 5 }, () => makeClient());
+            let gameId;
+            try {
+              await auth(host);
+              for (const client of playerClients) await auth(client);
+
+              const created = await rpc(host, 'create_live_game', {
+                game_title: `Kernablauf ${effect} ${Date.now()}`,
+                host_pin: '2486',
+              });
+              const game = created?.[0];
+              if (!game?.game_id || !game?.join_code) throw new Error('Testpartie konnte nicht erstellt werden.');
+              gameId = game.game_id;
+              const joinCode = String(game.join_code);
+
+              const players = [];
+              for (let i = 0; i < playerClients.length; i += 1) {
+                const joined = await rpc(playerClients[i], 'join_or_resume_live_game', {
+                  raw_join_code: joinCode,
+                  requested_display_name: `Test-${effect}-${i + 1}`,
+                  player_pin: String(1300 + i),
+                  requested_avatar_path: null,
+                });
+                players.push({ client: playerClients[i], memberId: joined[0].member_id, name: joined[0].display_name });
+              }
+
+              // Mission bewusst vor der Auslosung speichern, um den Synchronisationstrigger zu prüfen.
+              await rpc(host, 'select_live_round_mission', {
+                target_game_id: gameId,
+                target_round: 1,
+                mission_catalog_id: 'smoke-mission',
+                mission_title: 'Geheime Testmission',
+                mission_task: 'Erfülle unbemerkt die technische Testmission.',
+                mission_success_criteria: 'André bestätigt den Erfolg.',
+                mission_time_window: 'Runde 1',
+              });
+              await rpc(host, 'draw_random_millionaire', { target_game_id: gameId, excluded_member_id: null });
+
+              let overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+              const millionaireId = overview.game.currentMillionaireMemberId;
+              const millionaire = players.find((player) => player.memberId === millionaireId);
+              if (!millionaire) throw new Error('Der ausgeloste Millionär konnte keinem Testgerät zugeordnet werden.');
+              const nonMillionaires = players.filter((player) => player.memberId !== millionaireId);
+              const destination = nonMillionaires[0];
+              const source = nonMillionaires[1];
+              const actorOriginalTarget = nonMillionaires[2];
+
+              await rpc(host, 'mark_live_mission_status', {
+                target_game_id: gameId,
+                target_round: 1,
+                requested_status: 'completed',
+              });
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'advantage' });
+
+              await rpc(millionaire.client, 'choose_live_millionaire_advantage', {
+                target_game_id: gameId,
+                target_round: 1,
+                requested_effect: effect,
+                requested_source_member_id: effect === 'redirect_vote' ? source.memberId : null,
+                requested_target_member_id: effect === 'redirect_vote' ? destination.memberId : null,
+              });
+
+              const privateState = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
+              if (privateState?.advantage?.effect !== effect) throw new Error(`Privater Vorteil ${effect} wurde nicht gespeichert.`);
+
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'voting' });
+
+              if (effect === 'redirect_vote') {
+                await rpc(millionaire.client, 'submit_live_vote', { target_game_id: gameId, target_accused_member_id: actorOriginalTarget.memberId });
+                await rpc(source.client, 'submit_live_vote', { target_game_id: gameId, target_accused_member_id: source.memberId });
+                for (const player of nonMillionaires.filter((entry) => entry.memberId !== source.memberId)) {
+                  await rpc(player.client, 'submit_live_vote', { target_game_id: gameId, target_accused_member_id: destination.memberId });
+                }
+              } else {
+                for (const player of players) {
+                  await rpc(player.client, 'submit_live_vote', { target_game_id: gameId, target_accused_member_id: destination.memberId });
+                }
+              }
+
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'evaluation' });
+              const published = await rpc(host, 'finalize_live_round_vote', { target_game_id: gameId, target_round: 1 });
+              const totals = tallyMap(published);
+
+              if (effect === 'double_vote' && totals.get(destination.memberId) !== 6) {
+                throw new Error(`Doppelstimme falsch: erwartet 6, erhalten ${totals.get(destination.memberId)}.`);
+              }
+              if (effect === 'triple_vote' && totals.get(destination.memberId) !== 7) {
+                throw new Error(`Dreifachstimme falsch: erwartet 7, erhalten ${totals.get(destination.memberId)}.`);
+              }
+              if (effect === 'redirect_vote') {
+                if (totals.get(destination.memberId) !== 5) throw new Error(`Umleitungsziel falsch: erwartet 5, erhalten ${totals.get(destination.memberId)}.`);
+                if (totals.get(source.memberId) !== 0) throw new Error(`Ausgangsziel falsch: erwartet 0, erhalten ${totals.get(source.memberId)}.`);
+                if (totals.get(actorOriginalTarget.memberId) !== 0) throw new Error(`Ursprüngliche Millionärsstimme wurde nicht umgeleitet.`);
+              }
+
+              const publicResult = await rpc(nonMillionaires[0].client, 'get_live_public_round_result', { target_game_id: gameId, target_round: 1 });
+              const publicText = JSON.stringify(publicResult);
+              if (!publicResult.published || !publicResult.eliminatedMemberId) throw new Error('Öffentliches Ergebnis wurde nicht veröffentlicht.');
+              if (/millionaire|advantage|regularVotes|adjustment/i.test(publicText)) {
+                throw new Error('Die öffentliche Ergebnisansicht enthält geheime Rollen- oder Vorteilsdaten.');
+              }
+
+              overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+              const round = overview.rounds.find((entry) => Number(entry.round) === 1);
+              if (round?.advantage?.effect !== effect) throw new Error('Andrés geheime Übersicht enthält den Vorteil nicht korrekt.');
+              const eliminated = overview.players.find((player) => player.memberId === publicResult.eliminatedMemberId);
+              if (eliminated?.winnerPoolStatus !== 'eliminated') throw new Error('Die meistbeschuldigte Person wurde nicht aus dem Gewinnerpool entfernt.');
+              if (round?.scores?.length !== players.length) throw new Error('Die geheime Punkteübersicht ist unvollständig.');
+
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'role_transfer' });
+              const corkState = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
+              if (corkState.roleDecisionRequired !== true) throw new Error('Der überlebende Millionär wurde nicht zur Korkenentscheidung aufgefordert.');
+              await rpc(millionaire.client, 'submit_live_cork_decision', {
+                target_game_id: gameId,
+                requested_decision: index === 0 ? 'release' : 'keep',
+              });
+              overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+              const decision = overview.rounds.find((entry) => Number(entry.round) === 1)?.roleDecision;
+              if (!decision || !['release', 'keep'].includes(decision.decision)) throw new Error('Korkenentscheidung fehlt in Andrés Übersicht.');
+
+              await cleanup(host, gameId);
+              gameId = undefined;
+              console.log(`${effect}: Vorteil, Abstimmung, Eliminierung, öffentliche Ansicht und Korkenentscheidung erfolgreich.`);
+            } catch (error) {
+              if (gameId) {
+                try { await cleanup(host, gameId); } catch {}
+              }
+              throw error;
+            }
+          }
+
+          async function main() {
+            const effects = ['double_vote', 'triple_vote', 'redirect_vote'];
+            let lastError;
+            for (let attempt = 1; attempt <= 4; attempt += 1) {
+              try {
+                for (let index = 0; index < effects.length; index += 1) {
+                  await runScenario(effects[index], index);
+                }
+                console.log('Gesamter ursprünglicher Kernablauf erfolgreich geprüft.');
+                return;
+              } catch (error) {
+                lastError = error;
+                console.log(`Gesamtversuch ${attempt}/4 fehlgeschlagen: ${error?.message ?? error}`);
+                await sleep(5000);
+              }
+            }
+            throw lastError ?? new Error('Kernablauftest fehlgeschlagen.');
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Record core game flow status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          CORE_OUTCOME: ${{ steps.core.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$CORE_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Wiederhergestellter Kernablauf"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Vorteile, Eliminierung, öffentliche Ansicht, Punkte und Korken: $CORE_OUTCOME"
+            echo
+            echo "## Letzte Diagnosezeilen"
+            echo '```text'
+            if [[ -f core-game-flow.log ]]; then tail -n 100 core-game-flow.log; else echo "Keine Testausgabe vorhanden."; fi
+            echo '```'
+          } > docs/CORE_GAME_FLOW_STATUS.md
+          git add docs/CORE_GAME_FLOW_STATUS.md
+          git commit -m "[skip ci] Record restored core game flow status" || exit 0
+          git push origin main
+
+      - name: Fail unsuccessful core flow verification
+        if: always() && (steps.config.outcome != 'success' || steps.core.outcome != 'success')
+        run: exit 1
