@@ -1,23 +1,23 @@
 # Live-Partie-Smoke-Test
 
 - Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-07-24T03:57:41Z
-- Commit: 55da8f4206c1cc746962b4c46c4582ee161a1208
+- Zeitpunkt (UTC): 2026-07-24T04:05:39Z
+- Commit: 525be1d3baf0f46f145d076eeb610bd3cb36e325
 - Browser-Konfiguration: success
 - Partie erstellen, Host-PIN, Spielerbeitritt und Spieler-PIN: failure
 
 ## Letzte Diagnosezeilen
 ```text
-Versuch 1/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 2/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 3/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 4/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 5/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 6/6 fehlgeschlagen: column reference "game_id" is ambiguous
+Versuch 1/6 fehlgeschlagen: permission denied for table games
+Versuch 2/6 fehlgeschlagen: permission denied for table games
+Versuch 3/6 fehlgeschlagen: permission denied for table games
+Versuch 4/6 fehlgeschlagen: permission denied for table games
+Versuch 5/6 fehlgeschlagen: permission denied for table games
+Versuch 6/6 fehlgeschlagen: permission denied for table games
 {
-  code: '42702',
-  details: 'It could refer to either a PL/pgSQL variable or a table column.',
-  hint: null,
-  message: 'column reference "game_id" is ambiguous'
+  code: '42501',
+  details: null,
+  hint: 'Grant the required privileges to the current role with: GRANT SELECT, DELETE ON public.games TO authenticated;',
+  message: 'permission denied for table games'
 }
 ```
