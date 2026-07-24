@@ -104,6 +104,13 @@ jobs:
             }
           }
 
+          async function deleteGame(host, gameId) {
+            const cleanup = await host.rpc('delete_own_live_game', {
+              target_game_id: gameId,
+            });
+            if (cleanup.error) throw cleanup.error;
+          }
+
           async function verifyAttempt(attempt) {
             const host = client();
             const player = client();
@@ -159,13 +166,13 @@ jobs:
                 throw lookup.error ?? new Error('Die erzeugte Partie konnte nicht wiedergefunden werden.');
               }
 
-              const cleanup = await host.from('games').delete().eq('id', gameId);
-              if (cleanup.error) throw cleanup.error;
-              console.log('Live-Partie, Host-PIN, Spieler-PIN und Aufräumen funktionieren.');
+              await deleteGame(host, gameId);
+              gameId = undefined;
+              console.log('Live-Partie, Host-PIN, Spieler-PIN und sicheres Aufräumen funktionieren.');
               return;
             } catch (error) {
               if (gameId) {
-                await host.from('games').delete().eq('id', gameId).catch(() => undefined);
+                try { await deleteGame(host, gameId); } catch {}
               }
               throw new Error(`Versuch ${attempt}: ${error?.message ?? String(error)}`);
             }
