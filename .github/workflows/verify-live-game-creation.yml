@@ -242,3 +242,5 @@ jobs:
       - name: Fail unsuccessful smoke test
         if: always() && (steps.config.outcome != 'success' || steps.smoke.outcome != 'success')
         run: exit 1
+
+# Manual production retest requested on 2026-07-24.
