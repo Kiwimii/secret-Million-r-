@@ -1,5 +1,5 @@
 name: Verify live release
-# Verifies public Pages, anonymous Supabase Auth and the deployed live-game RPC.
+# Verifies public Pages, anonymous Supabase Auth and a complete live-game smoke test.
 
 on:
   workflow_run:
@@ -77,7 +77,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
-      - name: Verify anonymous Auth and live database RPC
+      - name: Verify complete live game flow
         id: backend
         continue-on-error: true
         shell: bash
@@ -89,31 +89,101 @@ jobs:
           const { createClient } = require('@supabase/supabase-js');
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-          async function verify() {
-            const client = createClient(
+          function client() {
+            return createClient(
               process.env.NEXT_PUBLIC_SUPABASE_URL,
               process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
               { auth: { persistSession: false, autoRefreshToken: false } },
             );
-            const auth = await client.auth.signInAnonymously();
+          }
+
+          async function authenticate(activeClient) {
+            const auth = await activeClient.auth.signInAnonymously();
             if (auth.error || !auth.data.user) {
               throw auth.error ?? new Error('Anonyme Authentifizierung lieferte keinen Benutzer.');
             }
+          }
 
+          async function verifyAttempt(attempt) {
+            const host = client();
+            const player = client();
+            let gameId;
+
+            try {
+              await authenticate(host);
+
+              const created = await host.rpc('create_live_game', {
+                game_title: `Release-Smoke-Test ${Date.now()}`,
+                host_pin: '2486',
+              });
+              if (created.error) throw created.error;
+              const game = Array.isArray(created.data) ? created.data[0] : undefined;
+              if (!game?.game_id || !/^\d{6}$/.test(String(game.join_code ?? ''))) {
+                throw new Error('create_live_game lieferte keine gültige Partie.');
+              }
+              gameId = game.game_id;
+              const joinCode = String(game.join_code);
+
+              const resumedHost = await host.rpc('resume_live_host', {
+                raw_join_code: joinCode,
+                host_pin: '2486',
+              });
+              if (resumedHost.error || resumedHost.data !== gameId) {
+                throw resumedHost.error ?? new Error('Die Spielleiter-PIN konnte nicht geprüft werden.');
+              }
+
+              await authenticate(player);
+              const playerName = `Testspieler-${String(Date.now()).slice(-6)}`;
+              const joined = await player.rpc('join_or_resume_live_game', {
+                raw_join_code: joinCode,
+                requested_display_name: playerName,
+                player_pin: '1357',
+                requested_avatar_path: null,
+              });
+              if (joined.error || !Array.isArray(joined.data) || !joined.data[0]?.member_id) {
+                throw joined.error ?? new Error('Ein Spielerprofil konnte nicht angelegt werden.');
+              }
+
+              const resumedPlayer = await player.rpc('join_or_resume_live_game', {
+                raw_join_code: joinCode,
+                requested_display_name: playerName,
+                player_pin: '1357',
+                requested_avatar_path: null,
+              });
+              if (resumedPlayer.error || !Array.isArray(resumedPlayer.data) || resumedPlayer.data[0]?.resumed !== true) {
+                throw resumedPlayer.error ?? new Error('Die Spieler-PIN konnte nicht erneut geprüft werden.');
+              }
+
+              const lookup = await player.rpc('lookup_live_game', { raw_join_code: joinCode });
+              if (lookup.error || !Array.isArray(lookup.data) || lookup.data[0]?.game_id !== gameId) {
+                throw lookup.error ?? new Error('Die erzeugte Partie konnte nicht wiedergefunden werden.');
+              }
+
+              const cleanup = await host.from('games').delete().eq('id', gameId);
+              if (cleanup.error) throw cleanup.error;
+              console.log('Live-Partie, Host-PIN, Spieler-PIN und Aufräumen funktionieren.');
+              return;
+            } catch (error) {
+              if (gameId) {
+                await host.from('games').delete().eq('id', gameId).catch(() => undefined);
+              }
+              throw new Error(`Versuch ${attempt}: ${error?.message ?? String(error)}`);
+            }
+          }
+
+          async function verify() {
             let lastError;
             for (let attempt = 1; attempt <= 36; attempt += 1) {
-              const result = await client.rpc('lookup_live_game', {
-                raw_join_code: '999999',
-              });
-              if (!result.error && Array.isArray(result.data)) {
-                console.log('Anonymous Auth und lookup_live_game sind erreichbar.');
+              try {
+                await verifyAttempt(attempt);
                 return;
+              } catch (error) {
+                lastError = error;
+                console.log(`Backend noch nicht bereit (${attempt}/36): ${error.message}`);
+                await sleep(10_000);
               }
-              lastError = result.error;
-              console.log(`Backend noch nicht bereit (${attempt}/36): ${result.error?.message ?? 'unerwartete Antwort'}`);
-              await sleep(10_000);
             }
-            throw lastError ?? new Error('Live-RPC blieb unerreichbar.');
+            throw lastError ?? new Error('Der vollständige Live-Spieltest blieb erfolglos.');
           }
 
           verify().catch((error) => {
@@ -165,7 +235,7 @@ jobs:
             echo "- Commit: $RELEASE_SHA"
             echo "- Öffentliche Seite: $LIVE_URL"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
-            echo "- Supabase Anonymous Auth und Live-RPC: $BACKEND_OUTCOME"
+            echo "- Vollständiger Live-Partie-Smoke-Test: $BACKEND_OUTCOME"
             echo "- GitHub Pages HTTP-Prüfung: $PAGE_OUTCOME"
           } > docs/LIVE_RELEASE_STATUS.md
 
