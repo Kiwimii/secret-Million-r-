@@ -1,12 +1,15 @@
 # Von André festgelegter Vorteilsablauf
 
-- Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-07-24T13:18:09Z
-- Commit: 75b0602547150005e68de2fd3157b734f13f8889
-- Browser-Konfiguration: skipped
-- André-Festlegung, Missionserfolg, Millionärsanwendung und Abstimmung: skipped
+- Status: erfolgreich
+- Zeitpunkt (UTC): 2026-07-24T13:29:11Z
+- Commit: 73d9b314b0513a17baf6eb83143ce3e0dbe1a0c8
+- Browser-Konfiguration: success
+- André-Festlegung, Missionserfolg, Millionärsanwendung und Abstimmung: success
 
 ## Letzte Diagnosezeilen
 ```text
-Keine Testausgabe vorhanden.
+double_vote: André-Festlegung, Missionserfolg, Anwendung und Abstimmung erfolgreich.
+triple_vote: André-Festlegung, Missionserfolg, Anwendung und Abstimmung erfolgreich.
+redirect_vote: André-Festlegung, Missionserfolg, Anwendung und Abstimmung erfolgreich.
+Host-selected advantage flow vollständig erfolgreich geprüft.
 ```
