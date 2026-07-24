@@ -132,3 +132,5 @@ jobs:
       - name: Fail unsuccessful database deployment
         if: always() && (steps.secrets.outcome != 'success' || steps.link.outcome != 'success' || steps.preview.outcome != 'success' || steps.apply.outcome != 'success')
         run: exit 1
+
+# Standalone hotfix deployment trigger: 2026-07-24
