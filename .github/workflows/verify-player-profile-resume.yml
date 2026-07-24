@@ -215,3 +215,5 @@ jobs:
       - name: Fail unsuccessful resume verification
         if: always() && (steps.config.outcome != 'success' || steps.resume.outcome != 'success')
         run: exit 1
+
+# Standalone production retest trigger: 2026-07-24
