@@ -1,8 +1,8 @@
 # Live-Partie-Smoke-Test
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T07:30:05Z
-- Commit: a5d8273ab5e6cb4baf7f55b06f8648559bc0cccb
+- Zeitpunkt (UTC): 2026-07-24T07:42:36Z
+- Commit: 7ff091b81a02c021bea457e69775fe477f1523e2
 - Browser-Konfiguration: success
 - Partie, PINs sowie Mission- und Challenge-Auswahl: success
 
