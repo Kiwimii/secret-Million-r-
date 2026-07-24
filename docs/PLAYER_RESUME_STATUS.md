@@ -1,8 +1,8 @@
 # Spieler-Wiedereintritt-Prüfung
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T12:46:30Z
-- Commit: 8daaae3999e9b2a675e3e6b2a5ddb79542bad254
+- Zeitpunkt (UTC): 2026-07-24T13:28:40Z
+- Commit: 73d9b314b0513a17baf6eb83143ce3e0dbe1a0c8
 - Browser-Konfiguration: success
 - Code, Profildropdown und PIN-Wiedereintritt: success
 
