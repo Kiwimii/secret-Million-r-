@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const SESSION_STORAGE_KEY = "secret-millionaer.live-session.v1";
+const START_PAGE_TARGET_SELECTOR = ".mf3-intro-content > div:last-child";
 
 type ResumeProfile = {
   gameId: string;
@@ -50,6 +52,7 @@ function mapProfile(row: RpcRow): ResumeProfile {
 export default function PlayerResumeGateway() {
   const [mounted, setMounted] = useState(false);
   const [hasStoredSession, setHasStoredSession] = useState(false);
+  const [startPageTarget, setStartPageTarget] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [profiles, setProfiles] = useState<ResumeProfile[]>([]);
@@ -62,6 +65,26 @@ export default function PlayerResumeGateway() {
   useEffect(() => {
     setMounted(true);
     setHasStoredSession(Boolean(window.localStorage.getItem(SESSION_STORAGE_KEY)));
+
+    const syncStartPageTarget = () => {
+      setStartPageTarget(document.querySelector<HTMLElement>(START_PAGE_TARGET_SELECTOR));
+    };
+
+    const syncStoredSession = () => {
+      setHasStoredSession(Boolean(window.localStorage.getItem(SESSION_STORAGE_KEY)));
+    };
+
+    syncStartPageTarget();
+    const observer = new MutationObserver(syncStartPageTarget);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("storage", syncStoredSession);
+    window.addEventListener("focus", syncStoredSession);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("storage", syncStoredSession);
+      window.removeEventListener("focus", syncStoredSession);
+    };
   }, []);
 
   const selectedProfile = useMemo(
@@ -110,6 +133,17 @@ export default function PlayerResumeGateway() {
     return () => window.clearTimeout(timer);
   }, [code, loadProfiles, open]);
 
+  function openResumeDialog() {
+    setHasStoredSession(false);
+    setOpen(true);
+    setError(undefined);
+  }
+
+  function closeResumeDialog() {
+    setOpen(false);
+    setError(undefined);
+  }
+
   async function resumeProfile() {
     if (code.length !== 6) {
       setError("Der Sitzungscode muss genau sechs Ziffern enthalten.");
@@ -156,102 +190,120 @@ export default function PlayerResumeGateway() {
     }
   }
 
-  if (!mounted || hasStoredSession) return null;
+  if (!mounted || (hasStoredSession && !startPageTarget && !open)) return null;
+
+  const startPageButton = startPageTarget
+    ? createPortal(
+        <button
+          className="mf2-button mf2-button-ghost mf-resume-start-option"
+          data-player-resume-entry="start-page"
+          type="button"
+          onClick={openResumeDialog}
+        >
+          <span aria-hidden="true">↻</span>
+          Laufendem Spiel wieder beitreten
+        </button>,
+        startPageTarget,
+      )
+    : null;
 
   return (
-    <div className={`mf-resume-gateway ${open ? "is-open" : ""}`} data-player-resume-gateway="profile-dropdown-v1">
-      {!open && (
-        <button className="mf-resume-trigger" type="button" onClick={() => setOpen(true)}>
-          <span>↻</span>
-          Laufendem Spiel wieder beitreten
-        </button>
-      )}
+    <>
+      {startPageButton}
+      <div className={`mf-resume-gateway ${open ? "is-open" : ""}`} data-player-resume-gateway="profile-dropdown-v1">
+        {!open && !startPageTarget && (
+          <button className="mf-resume-trigger" type="button" onClick={openResumeDialog}>
+            <span>↻</span>
+            Laufendem Spiel wieder beitreten
+          </button>
+        )}
 
-      {open && (
-        <div className="mf-resume-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setOpen(false);
-        }}>
-          <section className="mf-resume-dialog" role="dialog" aria-modal="true" aria-labelledby="mf-resume-title">
-            <button className="mf-resume-close" type="button" aria-label="Schließen" onClick={() => setOpen(false)}>×</button>
-            <p className="mf-resume-kicker">Wiedereintritt</p>
-            <h2 id="mf-resume-title">Bestehendes Profil öffnen</h2>
-            <p>Gib zuerst den Sitzungscode ein. Danach erscheinen alle bereits erstellten Profile dieser Partie.</p>
+        {open && (
+          <div className="mf-resume-backdrop" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeResumeDialog();
+          }}>
+            <section className="mf-resume-dialog" role="dialog" aria-modal="true" aria-labelledby="mf-resume-title">
+              <button className="mf-resume-close" type="button" aria-label="Schließen" onClick={closeResumeDialog}>×</button>
+              <p className="mf-resume-kicker">Wiedereintritt für Spieler</p>
+              <h2 id="mf-resume-title">Bestehendes Profil öffnen</h2>
+              <p>Gib zuerst den Sitzungscode ein. Danach erscheinen alle bereits erstellten Spielerprofile dieser Partie.</p>
 
-            <label className="mf-resume-field">
-              <span>Sitzungscode</span>
-              <input
-                autoFocus
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={code}
-                onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
-                placeholder="000000"
-              />
-            </label>
+              <label className="mf-resume-field">
+                <span>Sitzungscode</span>
+                <input
+                  autoFocus
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+                  placeholder="000000"
+                />
+              </label>
 
-            <div className={`mf-resume-profile-loader ${loadingProfiles ? "is-loading" : ""}`} aria-live="polite">
-              {code.length < 6 && <span>Nach sechs Ziffern werden die Profile automatisch geladen.</span>}
-              {loadingProfiles && <span>Profile werden geladen …</span>}
-              {code.length === 6 && !loadingProfiles && profiles.length > 0 && (
-                <button type="button" onClick={() => void loadProfiles(code)}>Profile neu laden</button>
-              )}
-            </div>
-
-            {profiles.length > 0 && (
-              <>
-                <label className="mf-resume-field">
-                  <span>Dein Profil</span>
-                  <select value={selectedMemberId} onChange={(event) => setSelectedMemberId(event.target.value)}>
-                    {profiles.map((profile) => (
-                      <option value={profile.memberId} key={profile.memberId}>{profile.displayName}</option>
-                    ))}
-                  </select>
-                </label>
-
-                {selectedProfile && (
-                  <div className="mf-resume-selected-profile">
-                    <span className="mf-resume-avatar">
-                      {selectedProfile.avatarPath ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={selectedProfile.avatarPath} alt="" />
-                      ) : selectedProfile.displayName.slice(0, 1).toUpperCase()}
-                    </span>
-                    <div>
-                      <strong>{selectedProfile.displayName}</strong>
-                      <span>{selectedProfile.gameTitle}</span>
-                    </div>
-                  </div>
+              <div className={`mf-resume-profile-loader ${loadingProfiles ? "is-loading" : ""}`} aria-live="polite">
+                {code.length < 6 && <span>Nach sechs Ziffern werden die Profile automatisch geladen.</span>}
+                {loadingProfiles && <span>Profile werden geladen …</span>}
+                {code.length === 6 && !loadingProfiles && profiles.length > 0 && (
+                  <button type="button" onClick={() => void loadProfiles(code)}>Profile neu laden</button>
                 )}
+              </div>
 
-                <label className="mf-resume-field">
-                  <span>Profil-PIN</span>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]{4}"
-                    maxLength={4}
-                    value={pin}
-                    onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-                    placeholder="••••"
-                  />
-                </label>
-              </>
-            )}
+              {profiles.length > 0 && (
+                <>
+                  <label className="mf-resume-field">
+                    <span>Dein bestehendes Profil</span>
+                    <select value={selectedMemberId} onChange={(event) => setSelectedMemberId(event.target.value)}>
+                      {profiles.map((profile) => (
+                        <option value={profile.memberId} key={profile.memberId}>{profile.displayName}</option>
+                      ))}
+                    </select>
+                  </label>
 
-            {error && <div className="mf-resume-error" role="alert">{error}</div>}
+                  {selectedProfile && (
+                    <div className="mf-resume-selected-profile">
+                      <span className="mf-resume-avatar">
+                        {selectedProfile.avatarPath ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={selectedProfile.avatarPath} alt="" />
+                        ) : selectedProfile.displayName.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div>
+                        <strong>{selectedProfile.displayName}</strong>
+                        <span>{selectedProfile.gameTitle}</span>
+                      </div>
+                    </div>
+                  )}
 
-            <button
-              className="mf-resume-submit"
-              type="button"
-              disabled={submitting || loadingProfiles || !selectedMemberId || pin.length !== 4}
-              onClick={() => void resumeProfile()}
-            >
-              {submitting ? "Profil wird geöffnet …" : "Laufendem Spiel wieder beitreten"}
-            </button>
-          </section>
-        </div>
-      )}
-    </div>
+                  <label className="mf-resume-field">
+                    <span>Profil-PIN</span>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]{4}"
+                      maxLength={4}
+                      value={pin}
+                      onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
+                      placeholder="••••"
+                    />
+                  </label>
+                </>
+              )}
+
+              {error && <div className="mf-resume-error" role="alert">{error}</div>}
+
+              <button
+                className="mf-resume-submit"
+                type="button"
+                disabled={submitting || loadingProfiles || !selectedMemberId || pin.length !== 4}
+                onClick={() => void resumeProfile()}
+              >
+                {submitting ? "Profil wird geöffnet …" : "Mit bestehendem Profil wieder beitreten"}
+              </button>
+            </section>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
