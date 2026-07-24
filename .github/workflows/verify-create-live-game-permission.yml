@@ -1,0 +1,123 @@
+name: Verify create live game permission
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-create-live-game-permission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-create-live-game-permission
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Resolve browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          key=$(node <<'NODE'
+          const keys = require('./api-keys.json');
+          const item = keys.find((entry) => entry.type === 'publishable') ?? keys.find((entry) => entry.name === 'anon');
+          if (!item?.api_key) process.exit(1);
+          process.stdout.write(item.api_key);
+          NODE
+          )
+          echo "::add-mask::$key"
+          echo "SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "SUPABASE_KEY=$key" >> "$GITHUB_ENV"
+      - name: Create and delete one live game
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          node <<'NODE' 2>&1 | tee create-live-game.log
+          const { createClient } = require('@supabase/supabase-js');
+          const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          async function rpc(name, args) {
+            const result = await client.rpc(name, args);
+            if (result.error) throw result.error;
+            return result.data;
+          }
+          async function main() {
+            const auth = await client.auth.signInAnonymously();
+            if (auth.error || !auth.data.user) throw auth.error ?? new Error('Anonyme Gerätesitzung fehlgeschlagen.');
+            let gameId;
+            try {
+              const created = await rpc('create_live_game', {
+                game_title: `Startcheck ${Date.now()}`,
+                host_pin: '2486',
+              });
+              const game = Array.isArray(created) ? created[0] : undefined;
+              if (!game?.game_id || !/^\d{6}$/.test(String(game.join_code ?? ''))) {
+                throw new Error('Partie oder sechsstelliger Sitzungscode fehlt.');
+              }
+              gameId = game.game_id;
+              console.log(`Partie erfolgreich erstellt; Sitzungscode ${game.join_code}.`);
+              await rpc('delete_own_live_game', { target_game_id: gameId });
+              gameId = undefined;
+              console.log('Testpartie erfolgreich gelöscht.');
+            } finally {
+              if (gameId) {
+                try { await rpc('delete_own_live_game', { target_game_id: gameId }); } catch {}
+              }
+            }
+          }
+          main().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+      - name: Record status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$VERIFY_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Partie-Erstellen-Startcheck"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Anonyme Sitzung, Partie erstellen und löschen: $VERIFY_OUTCOME"
+            echo
+            echo '```text'
+            tail -n 40 create-live-game.log 2>/dev/null || true
+            echo '```'
+          } > docs/CREATE_LIVE_GAME_STARTCHECK.md
+          git add docs/CREATE_LIVE_GAME_STARTCHECK.md
+          git commit -m "[skip ci] Record create_live_game start check" || exit 0
+          git push origin main
+      - name: Fail unsuccessful check
+        if: always() && (steps.config.outcome != 'success' || steps.verify.outcome != 'success')
+        run: exit 1
