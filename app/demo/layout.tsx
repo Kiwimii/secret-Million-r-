@@ -15,10 +15,12 @@ import "./start-page-player-resume.css";
 import "./game-integrity-overlay.css";
 import "./simplified-question-flow.css";
 import "./host-selected-advantage-flow.css";
+import "./round-transition-finale.css";
 import PlayerResumeGateway from "./PlayerResumeGateway";
 import GameIntegrityOverlay from "./GameIntegrityOverlay";
 import SimplifiedQuestionFlow from "./SimplifiedQuestionFlow";
 import HostSelectedAdvantageFlow from "./HostSelectedAdvantageFlow";
+import RoundTransitionFinaleOverlay from "./RoundTransitionFinaleOverlay";
 
 export default function DemoLayout({
   children,
@@ -29,11 +31,14 @@ export default function DemoLayout({
       data-core-game-flow="restored-v1"
       data-question-flow-version="offline-team-choice-v1"
       data-advantage-flow-version="host-selected-integrated-v2"
+      data-round-transition-version="automatic-cork-v1"
+      data-finale-version="ranking-v1"
     >
       <PlayerResumeGateway />
       <GameIntegrityOverlay />
       <SimplifiedQuestionFlow />
       <HostSelectedAdvantageFlow />
+      <RoundTransitionFinaleOverlay />
       {children}
     </div>
   );
