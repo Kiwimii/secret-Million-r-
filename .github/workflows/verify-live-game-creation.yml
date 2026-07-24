@@ -81,6 +81,13 @@ jobs:
             if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
           }
 
+          async function deleteGame(host, gameId) {
+            const cleanup = await host.rpc('delete_own_live_game', {
+              target_game_id: gameId,
+            });
+            if (cleanup.error) throw cleanup.error;
+          }
+
           async function runAttempt() {
             const host = makeClient();
             const player = makeClient();
@@ -123,12 +130,12 @@ jobs:
               });
               if (resumed.error || resumed.data?.[0]?.resumed !== true) throw resumed.error ?? new Error('Spieler-PIN-Prüfung fehlgeschlagen.');
 
-              const cleanup = await host.from('games').delete().eq('id', gameId);
-              if (cleanup.error) throw cleanup.error;
+              await deleteGame(host, gameId);
+              gameId = undefined;
               console.log('Echte Live-Partie inklusive Host- und Spieler-PIN erfolgreich geprüft.');
             } catch (error) {
               if (gameId) {
-                try { await host.from('games').delete().eq('id', gameId); } catch {}
+                try { await deleteGame(host, gameId); } catch {}
               }
               throw error;
             }
