@@ -1,8 +1,8 @@
 # Wiederhergestellter Kernablauf
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T11:58:46Z
-- Commit: 48e162e745ce7e209e847ec896a49d99fd8b7b24
+- Zeitpunkt (UTC): 2026-07-24T12:46:46Z
+- Commit: 8daaae3999e9b2a675e3e6b2a5ddb79542bad254
 - Browser-Konfiguration: success
 - Vorteile, Eliminierung, öffentliche Ansicht, Punkte und Korken: success
 
