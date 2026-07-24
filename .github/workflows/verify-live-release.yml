@@ -2,6 +2,9 @@ name: Verify live release
 # Verifies public Pages, anonymous Supabase Auth and the deployed live-game RPC.
 
 on:
+  workflow_run:
+    workflows: ["Deploy browser test"]
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -11,14 +14,20 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: verify-live-release
+  cancel-in-progress: true
+
 jobs:
   verify-live:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
       LIVE_URL: https://kiwimii.github.io/secret-Million-r-/demo/
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -153,7 +162,7 @@ jobs:
             echo
             echo "- Status: $overall"
             echo "- Zeitpunkt (UTC): $verified_at"
-            echo "- Commit: $GITHUB_SHA"
+            echo "- Commit: $RELEASE_SHA"
             echo "- Öffentliche Seite: $LIVE_URL"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
             echo "- Supabase Anonymous Auth und Live-RPC: $BACKEND_OUTCOME"
