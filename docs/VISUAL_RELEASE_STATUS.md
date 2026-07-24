@@ -1,11 +1,11 @@
-# Visual-Experience-V7-Prüfung
+# Visual-Experience-V8-Prüfung
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T14:12:29Z
-- Commit: ea1f1b854f66551d6130465bd0686302b00064f8
+- Zeitpunkt (UTC): 2026-07-24T14:20:33Z
+- Commit: c6d05e2cebae6f8e1048c9bb673d35ca31fcccb1
 - Öffentliche Seite: https://kiwimii.github.io/secret-Million-r-/demo/
 - V3-Design und verbindlicher Live-Ablauf: success
 - Wiederhergestellter Kernablauf im HTML: success
 - Sichtbare Startseiten-Wiedereintrittsversion: success
 - Vereinfachter Frageablauf ohne Profilwahl: success
-- Von André festgelegter Vorteilsablauf: success
+- Mission und Vorteil direkt in Andrés Übersicht: success
