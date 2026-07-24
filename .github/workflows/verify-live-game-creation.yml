@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/verify-live-game-creation.yml"
+      - "supabase/migrations/**"
   workflow_dispatch:
 
 permissions:
