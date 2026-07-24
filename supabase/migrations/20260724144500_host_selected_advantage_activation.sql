@@ -33,7 +33,7 @@ begin
   if advantage_effect not in ('double_vote', 'triple_vote', 'redirect_vote') then
     raise exception 'Zulässig sind nur doppelte Stimme, dreifache Stimme oder goldene Umleitung.';
   end if;
-  if advantage_selection_mode is distinct from case when advantage_effect = 'redirect_vote' then 'source_and_target' else 'none' end then
+  if advantage_selection_mode is distinct from (case when advantage_effect = 'redirect_vote' then 'source_and_target' else 'none' end) then
     raise exception 'Die Zielauswahl passt nicht zur gewählten Vorteilsart.';
   end if;
   if exists (
