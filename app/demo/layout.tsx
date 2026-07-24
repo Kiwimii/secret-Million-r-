@@ -16,6 +16,7 @@ import "./game-integrity-overlay.css";
 import "./simplified-question-flow.css";
 import "./host-selected-advantage-flow.css";
 import "./round-transition-finale.css";
+import "./between-rounds-lobby.css";
 import PlayerResumeGateway from "./PlayerResumeGateway";
 import GameIntegrityOverlay from "./GameIntegrityOverlay";
 import SimplifiedQuestionFlow from "./SimplifiedQuestionFlow";
@@ -31,8 +32,9 @@ export default function DemoLayout({
       data-core-game-flow="restored-v1"
       data-question-flow-version="offline-team-choice-v1"
       data-advantage-flow-version="host-selected-integrated-v2"
-      data-round-transition-version="automatic-cork-v1"
-      data-finale-version="ranking-v1"
+      data-round-transition-version="closable-lobby-v2"
+      data-finale-version="ranking-v2"
+      data-popup-close-version="all-transition-popups-v1"
     >
       <PlayerResumeGateway />
       <GameIntegrityOverlay />
