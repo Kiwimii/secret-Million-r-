@@ -1,23 +1,12 @@
 # Spieler-Wiedereintritt-Prüfung
 
-- Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-07-24T11:17:26Z
-- Commit: efa2a69a2b5cef29713f5e502123fa297f3e582d
+- Status: erfolgreich
+- Zeitpunkt (UTC): 2026-07-24T11:58:33Z
+- Commit: 48e162e745ce7e209e847ec896a49d99fd8b7b24
 - Browser-Konfiguration: success
-- Code, Profildropdown und PIN-Wiedereintritt: failure
+- Code, Profildropdown und PIN-Wiedereintritt: success
 
 ## Letzte Diagnosezeilen
 ```text
-Versuch 1/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 2/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 3/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 4/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 5/6 fehlgeschlagen: column reference "game_id" is ambiguous
-Versuch 6/6 fehlgeschlagen: column reference "game_id" is ambiguous
-{
-  code: '42702',
-  details: 'It could refer to either a PL/pgSQL variable or a table column.',
-  hint: null,
-  message: 'column reference "game_id" is ambiguous'
-}
+Wiedereintritt erfolgreich: Code, Profildropdown, falscher PIN und korrekter PIN wurden geprüft.
 ```
