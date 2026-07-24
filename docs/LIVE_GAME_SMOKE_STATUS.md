@@ -1,12 +1,23 @@
 # Live-Partie-Smoke-Test
 
-- Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-24T04:16:47Z
-- Commit: 3244d638fd5acd93fb098babb452e9ebfd30784c
+- Status: fehlgeschlagen
+- Zeitpunkt (UTC): 2026-07-24T07:24:54Z
+- Commit: 4e8d1bc6e2d8ae0d4a96e201d057317309858933
 - Browser-Konfiguration: success
-- Partie erstellen, Host-PIN, Spielerbeitritt und Spieler-PIN: success
+- Partie, PINs sowie Mission- und Challenge-Auswahl: failure
 
 ## Letzte Diagnosezeilen
 ```text
-Echte Live-Partie inklusive Host- und Spieler-PIN erfolgreich geprüft.
+Versuch 1/6 fehlgeschlagen: permission denied for table games
+Versuch 2/6 fehlgeschlagen: permission denied for table games
+Versuch 3/6 fehlgeschlagen: permission denied for table games
+Versuch 4/6 fehlgeschlagen: permission denied for table games
+Versuch 5/6 fehlgeschlagen: permission denied for table games
+Versuch 6/6 fehlgeschlagen: permission denied for table games
+{
+  code: '42501',
+  details: null,
+  hint: 'Grant the required privileges to the current role with: GRANT SELECT ON public.games TO authenticated;',
+  message: 'permission denied for table games'
+}
 ```
