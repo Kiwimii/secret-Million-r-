@@ -5,6 +5,7 @@ import "./onboarding.css";
 import "./onboarding-fixes.css";
 import "./onboarding-scenes.css";
 import "./live-game.css";
+import "./midnight-fortune.css";
 
 export default function DemoLayout({
   children,
