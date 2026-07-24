@@ -1,0 +1,75 @@
+name: Verify visual experience V2
+
+on:
+  workflow_run:
+    workflows: ["Deploy browser test"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-visual-v2
+  cancel-in-progress: true
+
+jobs:
+  verify-visual-v2:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      LIVE_URL: https://kiwimii.github.io/secret-Million-r-/demo/
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify deployed V2 marker
+        id: visual
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location "$LIVE_URL" --output live-page.html; then
+              if grep -qi 'data-visual-version="midnight-fortune-v2"' live-page.html; then
+                echo "Midnight Fortune Visual Experience V2 ist öffentlich ausgeliefert."
+                exit 0
+              fi
+            fi
+            echo "V2-Deployment noch nicht sichtbar ($attempt/36)."
+            sleep 10
+          done
+          exit 1
+
+      - name: Record visual release status
+        if: always()
+        env:
+          VISUAL_OUTCOME: ${{ steps.visual.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$VISUAL_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Visual-Experience-V2-Prüfung"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $RELEASE_SHA"
+            echo "- Öffentliche Seite: $LIVE_URL"
+            echo "- V2-Kennung im ausgelieferten HTML: $VISUAL_OUTCOME"
+          } > docs/VISUAL_RELEASE_STATUS.md
+          git add docs/VISUAL_RELEASE_STATUS.md
+          git commit -m "[skip ci] Record visual V2 release status" || exit 0
+          git push origin main
+
+      - name: Fail missing V2 release
+        if: always() && steps.visual.outcome != 'success'
+        run: exit 1

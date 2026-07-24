@@ -1,0 +1,75 @@
+/* Cross-browser fallbacks for V2 animation math. */
+.mf2-phase-rail:has(>div:nth-child(1).is-active)>i{left:5px}
+.mf2-phase-rail:has(>div:nth-child(2).is-active)>i{left:calc(20% + 5px)}
+.mf2-phase-rail:has(>div:nth-child(3).is-active)>i{left:calc(40% + 5px)}
+.mf2-phase-rail:has(>div:nth-child(4).is-active)>i{left:calc(60% + 5px)}
+.mf2-phase-rail:has(>div:nth-child(5).is-active)>i{left:calc(80% + 5px)}
+.mf2-progress-card .mf2-readiness i{width:0}
+.mf2-progress-card:has(.mf2-checks .done) .mf2-readiness i{width:25%}
+.mf2-progress-card:has(.mf2-checks .done~.done) .mf2-readiness i{width:50%}
+.mf2-progress-card:has(.mf2-checks .done~.done~.done) .mf2-readiness i{width:75%}
+.mf2-progress-card:has(.mf2-checks .done~.done~.done~.done) .mf2-readiness i{width:100%}
+.mf2-particles i:nth-child(1){left:0%;top:102%;width:2px;height:2px;opacity:.18;animation-duration:10s;animation-delay:0s}
+.mf2-particles i:nth-child(2){left:37%;top:109%;width:3px;height:3px;opacity:.27;animation-duration:11.6s;animation-delay:-.63s}
+.mf2-particles i:nth-child(3){left:74%;top:116%;width:4px;height:4px;opacity:.36;animation-duration:13.2s;animation-delay:-1.26s}
+.mf2-particles i:nth-child(4){left:11%;top:123%;width:5px;height:5px;opacity:.45;animation-duration:14.8s;animation-delay:-1.89s}
+.mf2-particles i:nth-child(5){left:48%;top:130%;width:2px;height:2px;opacity:.54;animation-duration:16.4s;animation-delay:-2.52s}
+.mf2-particles i:nth-child(6){left:85%;top:137%;width:3px;height:3px;opacity:.18;animation-duration:18s;animation-delay:-3.15s}
+.mf2-particles i:nth-child(7){left:22%;top:144%;width:4px;height:4px;opacity:.27;animation-duration:19.6s;animation-delay:-3.78s}
+.mf2-particles i:nth-child(8){left:59%;top:151%;width:5px;height:5px;opacity:.36;animation-duration:21.2s;animation-delay:-4.41s}
+.mf2-particles i:nth-child(9){left:96%;top:158%;width:2px;height:2px;opacity:.45;animation-duration:10s;animation-delay:-5.04s}
+.mf2-particles i:nth-child(10){left:33%;top:102%;width:3px;height:3px;opacity:.54;animation-duration:11.6s;animation-delay:-5.67s}
+.mf2-particles i:nth-child(11){left:70%;top:109%;width:4px;height:4px;opacity:.18;animation-duration:13.2s;animation-delay:-6.3s}
+.mf2-particles i:nth-child(12){left:7%;top:116%;width:5px;height:5px;opacity:.27;animation-duration:14.8s;animation-delay:-6.93s}
+.mf2-particles i:nth-child(13){left:44%;top:123%;width:2px;height:2px;opacity:.36;animation-duration:16.4s;animation-delay:-7.56s}
+.mf2-particles i:nth-child(14){left:81%;top:130%;width:3px;height:3px;opacity:.45;animation-duration:18s;animation-delay:-8.19s}
+.mf2-particles i:nth-child(15){left:18%;top:137%;width:4px;height:4px;opacity:.54;animation-duration:19.6s;animation-delay:-8.82s}
+.mf2-particles i:nth-child(16){left:55%;top:144%;width:5px;height:5px;opacity:.18;animation-duration:21.2s;animation-delay:-9.45s}
+.mf2-particles i:nth-child(17){left:92%;top:151%;width:2px;height:2px;opacity:.27;animation-duration:10s;animation-delay:-10.08s}
+.mf2-particles i:nth-child(18){left:29%;top:158%;width:3px;height:3px;opacity:.36;animation-duration:11.6s;animation-delay:-10.71s}
+.mf2-particles i:nth-child(19){left:66%;top:102%;width:4px;height:4px;opacity:.45;animation-duration:13.2s;animation-delay:-11.34s}
+.mf2-particles i:nth-child(20){left:3%;top:109%;width:5px;height:5px;opacity:.54;animation-duration:14.8s;animation-delay:-11.97s}
+.mf2-particles i:nth-child(21){left:40%;top:116%;width:2px;height:2px;opacity:.18;animation-duration:16.4s;animation-delay:-12.6s}
+.mf2-particles i:nth-child(22){left:77%;top:123%;width:3px;height:3px;opacity:.27;animation-duration:18s;animation-delay:-13.23s}
+.mf2-particles i:nth-child(23){left:14%;top:130%;width:4px;height:4px;opacity:.36;animation-duration:19.6s;animation-delay:-13.86s}
+.mf2-particles i:nth-child(24){left:51%;top:137%;width:5px;height:5px;opacity:.45;animation-duration:21.2s;animation-delay:-14.49s}
+.mf2-particles i:nth-child(25){left:88%;top:144%;width:2px;height:2px;opacity:.54;animation-duration:10s;animation-delay:-15.12s}
+.mf2-particles i:nth-child(26){left:25%;top:151%;width:3px;height:3px;opacity:.18;animation-duration:11.6s;animation-delay:-15.75s}
+.mf2-particles i:nth-child(27){left:62%;top:158%;width:4px;height:4px;opacity:.27;animation-duration:13.2s;animation-delay:-16.38s}
+.mf2-particles i:nth-child(28){left:99%;top:102%;width:5px;height:5px;opacity:.36;animation-duration:14.8s;animation-delay:-17.01s}
+.mf2-confetti i:nth-child(1){left:0%;width:4px;height:10px;transform:rotate(0deg);animation-duration:3.5s;animation-delay:0s}
+.mf2-confetti i:nth-child(2){left:29%;width:6px;height:13px;transform:rotate(27deg);animation-duration:3.85s;animation-delay:-.13s}
+.mf2-confetti i:nth-child(3){left:58%;width:8px;height:16px;transform:rotate(54deg);animation-duration:4.2s;animation-delay:-.26s}
+.mf2-confetti i:nth-child(4){left:87%;width:10px;height:19px;transform:rotate(81deg);animation-duration:4.55s;animation-delay:-.39s}
+.mf2-confetti i:nth-child(5){left:16%;width:4px;height:22px;transform:rotate(108deg);animation-duration:4.9s;animation-delay:-.52s}
+.mf2-confetti i:nth-child(6){left:45%;width:6px;height:10px;transform:rotate(135deg);animation-duration:5.25s;animation-delay:-.65s}
+.mf2-confetti i:nth-child(7){left:74%;width:8px;height:13px;transform:rotate(162deg);animation-duration:3.5s;animation-delay:-.78s}
+.mf2-confetti i:nth-child(8){left:3%;width:10px;height:16px;transform:rotate(189deg);animation-duration:3.85s;animation-delay:-.91s}
+.mf2-confetti i:nth-child(9){left:32%;width:4px;height:19px;transform:rotate(216deg);animation-duration:4.2s;animation-delay:-1.04s}
+.mf2-confetti i:nth-child(10){left:61%;width:6px;height:22px;transform:rotate(243deg);animation-duration:4.55s;animation-delay:-1.17s}
+.mf2-confetti i:nth-child(11){left:90%;width:8px;height:10px;transform:rotate(270deg);animation-duration:4.9s;animation-delay:-1.3s}
+.mf2-confetti i:nth-child(12){left:19%;width:10px;height:13px;transform:rotate(297deg);animation-duration:5.25s;animation-delay:-1.43s}
+.mf2-confetti i:nth-child(13){left:48%;width:4px;height:16px;transform:rotate(324deg);animation-duration:3.5s;animation-delay:-1.56s}
+.mf2-confetti i:nth-child(14){left:77%;width:6px;height:19px;transform:rotate(351deg);animation-duration:3.85s;animation-delay:-1.69s}
+.mf2-confetti i:nth-child(15){left:6%;width:8px;height:22px;transform:rotate(378deg);animation-duration:4.2s;animation-delay:-1.82s}
+.mf2-confetti i:nth-child(16){left:35%;width:10px;height:10px;transform:rotate(405deg);animation-duration:4.55s;animation-delay:-1.95s}
+.mf2-confetti i:nth-child(17){left:64%;width:4px;height:13px;transform:rotate(432deg);animation-duration:4.9s;animation-delay:-2.08s}
+.mf2-confetti i:nth-child(18){left:93%;width:6px;height:16px;transform:rotate(459deg);animation-duration:5.25s;animation-delay:-2.21s}
+.mf2-confetti i:nth-child(19){left:22%;width:8px;height:19px;transform:rotate(486deg);animation-duration:3.5s;animation-delay:-2.34s}
+.mf2-confetti i:nth-child(20){left:51%;width:10px;height:22px;transform:rotate(513deg);animation-duration:3.85s;animation-delay:-2.47s}
+.mf2-confetti i:nth-child(21){left:80%;width:4px;height:10px;transform:rotate(540deg);animation-duration:4.2s;animation-delay:-2.6s}
+.mf2-confetti i:nth-child(22){left:9%;width:6px;height:13px;transform:rotate(567deg);animation-duration:4.55s;animation-delay:-2.73s}
+.mf2-confetti i:nth-child(23){left:38%;width:8px;height:16px;transform:rotate(594deg);animation-duration:4.9s;animation-delay:-2.86s}
+.mf2-confetti i:nth-child(24){left:67%;width:10px;height:19px;transform:rotate(621deg);animation-duration:5.25s;animation-delay:-2.99s}
+.mf2-confetti i:nth-child(25){left:96%;width:4px;height:22px;transform:rotate(648deg);animation-duration:3.5s;animation-delay:-3.12s}
+.mf2-confetti i:nth-child(26){left:25%;width:6px;height:10px;transform:rotate(675deg);animation-duration:3.85s;animation-delay:-3.25s}
+.mf2-confetti i:nth-child(27){left:54%;width:8px;height:13px;transform:rotate(702deg);animation-duration:4.2s;animation-delay:-3.38s}
+.mf2-confetti i:nth-child(28){left:83%;width:10px;height:16px;transform:rotate(729deg);animation-duration:4.55s;animation-delay:-3.51s}
+.mf2-confetti i:nth-child(29){left:12%;width:4px;height:19px;transform:rotate(756deg);animation-duration:4.9s;animation-delay:-3.64s}
+.mf2-confetti i:nth-child(30){left:41%;width:6px;height:22px;transform:rotate(783deg);animation-duration:5.25s;animation-delay:-3.77s}
+.mf2-confetti i:nth-child(31){left:70%;width:8px;height:10px;transform:rotate(810deg);animation-duration:3.5s;animation-delay:-3.9s}
+.mf2-confetti i:nth-child(32){left:99%;width:10px;height:13px;transform:rotate(837deg);animation-duration:3.85s;animation-delay:-4.03s}
+.mf2-confetti i:nth-child(33){left:28%;width:4px;height:16px;transform:rotate(864deg);animation-duration:4.2s;animation-delay:-4.16s}
+.mf2-confetti i:nth-child(34){left:57%;width:6px;height:19px;transform:rotate(891deg);animation-duration:4.55s;animation-delay:-4.29s}
+.mf2-confetti i:nth-child(35){left:86%;width:8px;height:22px;transform:rotate(918deg);animation-duration:4.9s;animation-delay:-4.42s}
+.mf2-confetti i:nth-child(36){left:15%;width:10px;height:10px;transform:rotate(945deg);animation-duration:5.25s;animation-delay:-4.55s}

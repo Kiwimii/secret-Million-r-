@@ -1,1 +1,1 @@
-export { default } from "./LiveGameApp";
+export { default } from "./LiveGameAppV2";
