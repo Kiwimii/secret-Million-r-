@@ -1,0 +1,216 @@
+name: Verify simplified question flow
+
+on:
+  workflow_run:
+    workflows: ["Deploy Supabase Database"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-simplified-question-flow
+  cancel-in-progress: true
+
+jobs:
+  verify-question-flow:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve Supabase browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable') ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Verify question flow without selecting a profile
+        id: question
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE' 2>&1 | tee simplified-question-flow.log
+          const { createClient } = require('@supabase/supabase-js');
+          const makeClient = () => createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false } },
+          );
+          async function auth(client) {
+            const result = await client.auth.signInAnonymously();
+            if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+          async function rpc(client, name, args) {
+            const result = await client.rpc(name, args);
+            if (result.error) throw new Error(`${name}: ${result.error.message}`);
+            return result.data;
+          }
+          async function lookup(client, code) {
+            const data = await rpc(client, 'lookup_live_game', { raw_join_code: code });
+            const row = Array.isArray(data) ? data[0] : undefined;
+            if (!row) throw new Error('Partie konnte nicht geladen werden.');
+            return row;
+          }
+          async function setPhase(host, gameId, code, phase) {
+            const state = await lookup(host, code);
+            await rpc(host, 'set_live_game_phase', {
+              target_game_id: gameId,
+              target_round: 1,
+              target_phase: phase,
+              expected_revision: state.revision,
+            });
+          }
+          async function main() {
+            const host = makeClient();
+            const players = [makeClient(), makeClient()];
+            let gameId;
+            try {
+              await auth(host);
+              for (const player of players) await auth(player);
+              const created = await rpc(host, 'create_live_game', {
+                game_title: `Vereinfachter Fragetest ${Date.now()}`,
+                host_pin: '2486',
+              });
+              const game = created?.[0];
+              if (!game?.game_id || !game?.join_code) throw new Error('Testpartie konnte nicht erstellt werden.');
+              gameId = game.game_id;
+              const code = String(game.join_code);
+
+              for (let index = 0; index < players.length; index += 1) {
+                await rpc(players[index], 'join_or_resume_live_game', {
+                  raw_join_code: code,
+                  requested_display_name: `Fragetest-${index + 1}-${Date.now()}`,
+                  player_pin: String(1357 + index),
+                  requested_avatar_path: null,
+                });
+              }
+
+              await rpc(host, 'select_live_challenge', {
+                target_game_id: gameId,
+                target_round: 1,
+                challenge_catalog_id: 'simplified-question-smoke',
+                challenge_title: 'Vereinfachter Fragetest',
+                challenge_public_name: 'Fragetest',
+                challenge_player_briefing: 'Technischer Test des vereinfachten Frageablaufs.',
+                challenge_host_instructions: 'Keine reale Challenge.',
+                challenge_duration: '1 Minute',
+                challenge_material: [],
+                challenge_win_condition: 'Der Ablauf wird ohne Fragestellerprofil abgeschlossen.',
+                challenge_safety_note: 'Keine reale Durchführung.',
+              });
+              await rpc(host, 'draw_live_challenge_teams', {
+                target_game_id: gameId,
+                target_round: 1,
+              });
+              await setPhase(host, gameId, code, 'challenge');
+
+              const lobby = await rpc(host, 'get_public_lobby_members', { target_game_id: gameId });
+              const winningTeam = lobby.find((entry) => entry.challenge_team)?.challenge_team;
+              if (!winningTeam) throw new Error('Kein Siegerteam bestimmbar.');
+              await rpc(host, 'confirm_live_challenge_winner', {
+                target_game_id: gameId,
+                target_round: 1,
+                winning_team_code: winningTeam,
+              });
+              await setPhase(host, gameId, code, 'question');
+
+              const before = await rpc(host, 'get_live_public_round_flow', { target_game_id: gameId });
+              if (before.questionSelectionMode !== 'offline_team_choice') {
+                throw new Error('Der Offline-Teamprozess ist nicht aktiv.');
+              }
+              if (before.questionCompletedAt) throw new Error('Die Frage ist vor Andrés Bestätigung bereits abgeschlossen.');
+
+              // Entscheidend: keine select_live_questioner-Anfrage.
+              await rpc(host, 'complete_live_question', {
+                target_game_id: gameId,
+                target_round: 1,
+              });
+
+              const afterState = await lookup(host, code);
+              if (afterState.phase !== 'discussion') {
+                throw new Error(`Nach der Bestätigung wurde nicht automatisch weitergeschaltet: ${afterState.phase}`);
+              }
+              const after = await rpc(host, 'get_live_public_round_flow', { target_game_id: gameId });
+              if (!after.questionCompletedAt) throw new Error('Andrés Bestätigung wurde nicht gespeichert.');
+
+              await rpc(host, 'delete_own_live_game', { target_game_id: gameId });
+              gameId = undefined;
+              console.log('Siegerteam-Meldung, Bestätigung ohne Profilwahl und automatischer Wechsel zur Diskussion erfolgreich.');
+            } finally {
+              if (gameId) {
+                try { await rpc(host, 'delete_own_live_game', { target_game_id: gameId }); } catch {}
+              }
+            }
+          }
+          main().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+
+      - name: Record simplified question-flow status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          QUESTION_OUTCOME: ${{ steps.question.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$QUESTION_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Vereinfachter Fragesteller-Ablauf"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Ohne Profilwahl, André-Bestätigung und automatisches Weiterschalten: $QUESTION_OUTCOME"
+            echo
+            echo "## Letzte Diagnosezeilen"
+            echo '```text'
+            if [[ -f simplified-question-flow.log ]]; then tail -n 80 simplified-question-flow.log; else echo "Keine Testausgabe vorhanden."; fi
+            echo '```'
+          } > docs/SIMPLIFIED_QUESTION_FLOW_STATUS.md
+          git add docs/SIMPLIFIED_QUESTION_FLOW_STATUS.md
+          git commit -m "[skip ci] Record simplified question flow status" || exit 0
+          git push origin main
+
+      - name: Fail unsuccessful question-flow verification
+        if: always() && (steps.config.outcome != 'success' || steps.question.outcome != 'success')
+        run: exit 1
