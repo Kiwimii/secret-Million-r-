@@ -2,7 +2,7 @@
 -- * Das Siegerteam bestimmt den Fragesteller ausschließlich mündlich untereinander.
 -- * Es wird kein Spielerprofil mehr als Fragesteller gespeichert oder ausgewählt.
 -- * André bestätigt nur noch, dass die Frage gestellt wurde.
--- * Danach darf die Partie in die Diskussion wechseln.
+-- * Die Bestätigung wechselt die Partie unmittelbar in die Diskussion.
 
 create or replace function public.select_live_questioner(
   target_game_id uuid,
@@ -27,25 +27,50 @@ language plpgsql
 security definer
 set search_path = public, extensions, pg_temp
 as $$
+declare
+  new_revision bigint;
 begin
   if not public.is_game_host(target_game_id) then
     raise exception 'Nur André darf bestätigen, dass die Frage gestellt wurde.' using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1
+    from public.challenge_rounds cr
+    where cr.game_id = target_game_id
+      and cr.round_number = target_round
+      and cr.winning_team is not null
+      and cr.winner_confirmed_at is not null
+  ) then
+    raise exception 'André muss zuerst das Siegerteam bestätigen.';
+  end if;
+
+  update public.games
+  set phase = 'discussion',
+      revision = revision + 1,
+      updated_at = now()
+  where id = target_game_id
+    and current_round = target_round
+    and phase = 'question'
+  returning revision into new_revision;
+
+  if new_revision is null then
+    raise exception 'Die Frage kann nur in der laufenden Fragephase bestätigt werden.';
   end if;
 
   update public.challenge_rounds
   set questioner_member_id = null,
       question_completed_at = now()
   where game_id = target_game_id
-    and round_number = target_round
-    and winning_team is not null
-    and winner_confirmed_at is not null;
+    and round_number = target_round;
 
-  if not found then
-    raise exception 'André muss zuerst das Siegerteam bestätigen.';
-  end if;
+  update public.player_progress
+  set phase_seen = 'discussion',
+      updated_at = now()
+  where game_id = target_game_id;
 
   insert into public.live_game_updates (game_id, update_type)
-  values (target_game_id, 'question_asked_confirmed');
+  values (target_game_id, 'question_asked_and_discussion_started');
 end;
 $$;
 
@@ -295,4 +320,4 @@ grant execute on function public.select_live_questioner(uuid, uuid) to authentic
 grant execute on function public.complete_live_question(uuid, smallint) to authenticated;
 
 comment on function public.complete_live_question(uuid, smallint) is
-  'André bestätigt nur, dass die vom Siegerteam mündlich organisierte Frage gestellt wurde.';
+  'André bestätigt nur, dass die vom Siegerteam mündlich organisierte Frage gestellt wurde; danach startet automatisch die Diskussion.';
