@@ -1,4 +1,4 @@
-name: Verify visual experience V4
+name: Verify visual experience V5
 
 on:
   workflow_run:
@@ -14,11 +14,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: verify-visual-v4
+  group: verify-visual-v5
   cancel-in-progress: true
 
 jobs:
-  verify-visual-v4:
+  verify-visual-v5:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -31,7 +31,7 @@ jobs:
         with:
           ref: main
 
-      - name: Verify deployed restored-core markers
+      - name: Verify deployed start-page resume marker
         id: visual
         continue-on-error: true
         shell: bash
@@ -42,12 +42,12 @@ jobs:
               if grep -qi 'data-visual-version="midnight-fortune-v3"' live-page.html \
                  && grep -qi 'data-live-flow="authoritative"' live-page.html \
                  && grep -qi 'data-core-game-flow="restored-v1"' live-page.html \
-                 && grep -qi 'data-player-resume-version="profile-dropdown-v1"' live-page.html; then
-                echo "V4 ist öffentlich: V3-Design, verbindlicher Ablauf, wiederhergestellter Spielkern und Profil-Wiedereintritt."
+                 && grep -qi 'data-player-resume-version="profile-dropdown-v2"' live-page.html; then
+                echo "V5 ist öffentlich: Design, verbindlicher Ablauf, Spielkern und sichtbare Startseiten-Wiedereintrittsversion."
                 exit 0
               fi
             fi
-            echo "V4-Deployment noch nicht vollständig sichtbar ($attempt/36)."
+            echo "V5-Deployment noch nicht vollständig sichtbar ($attempt/36)."
             sleep 10
           done
           exit 1
@@ -65,7 +65,7 @@ jobs:
           status="erfolgreich"
           if [[ "$VISUAL_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
           {
-            echo "# Visual-Experience-V4-Prüfung"
+            echo "# Visual-Experience-V5-Prüfung"
             echo
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -73,12 +73,12 @@ jobs:
             echo "- Öffentliche Seite: $LIVE_URL"
             echo "- V3-Design und verbindlicher Live-Ablauf: $VISUAL_OUTCOME"
             echo "- Wiederhergestellter Kernablauf im HTML: $VISUAL_OUTCOME"
-            echo "- Profil-Wiedereintritt im HTML: $VISUAL_OUTCOME"
+            echo "- Sichtbare Startseiten-Wiedereintrittsversion: $VISUAL_OUTCOME"
           } > docs/VISUAL_RELEASE_STATUS.md
           git add docs/VISUAL_RELEASE_STATUS.md
-          git commit -m "[skip ci] Record visual V4 release status" || exit 0
+          git commit -m "[skip ci] Record visual V5 release status" || exit 0
           git push origin main
 
-      - name: Fail missing V4 release
+      - name: Fail missing V5 release
         if: always() && steps.visual.outcome != 'success'
         run: exit 1
