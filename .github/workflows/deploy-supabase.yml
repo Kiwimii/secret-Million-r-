@@ -25,89 +25,15 @@ jobs:
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
-
-      - name: Patch reliable multi-device synchronization
-        shell: bash
-        run: |
-          set -euo pipefail
-          python <<'PY'
-          from pathlib import Path
-
-          hook = Path('lib/live/useLiveGame.ts')
-          text = hook.read_text()
-          marker = '''  useEffect(() => {
-    if (!identity || identity.accessRole !== "player") return;
-    const timer = window.setInterval(() => {
-      const client = clientRef.current;
-      if (!client) return;
-      const patch = progressRef.current;
-      void rpcRows(client, "update_own_player_progress", {
-        target_game_id: identity.gameId,
-        requested_screen_key: patch.screenKey,
-        requested_step_key: patch.stepKey,
-        requested_phase_seen: patch.phaseSeen,
-        requested_role_revealed: patch.roleRevealed ?? null,
-        requested_mission_opened: patch.missionOpened ?? null,
-        requested_advantage_opened: patch.advantageOpened ?? null,
-        requested_challenge_opened: patch.challengeBriefingOpened ?? null,
-        requested_vote_submitted: patch.voteSubmitted ?? null,
-        requested_role_decision_submitted: patch.roleDecisionSubmitted ?? null,
-      }).catch(() => undefined);
-    }, HEARTBEAT_MS);
-    return () => window.clearInterval(timer);
-  }, [identity]);
-'''
-          addition = marker + '''
-  // Realtime bleibt der schnelle Weg. Das Polling ist der verlässliche Rückfall,
-  // falls ein Mobilbrowser die WebSocket-Verbindung pausiert oder verwirft.
-  useEffect(() => {
-    if (!identity) return;
-    let disposed = false;
-
-    const syncNow = () => {
-      if (disposed) return;
-      void refreshForIdentity(identity).catch(() => undefined);
-    };
-    const timer = window.setInterval(syncNow, 2500);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") syncNow();
-    };
-
-    window.addEventListener("focus", syncNow);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", syncNow);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [identity, refreshForIdentity]);
-'''
-          if 'Das Polling ist der verlässliche Rückfall' not in text:
-              if marker not in text:
-                  raise SystemExit('Heartbeat-Marker nicht gefunden')
-              hook.write_text(text.replace(marker, addition, 1))
-
-          migration = Path('supabase/migrations/20260724002000_reliable_live_sync.sql')
-          if not migration.exists():
-              migration.write_text('''-- Verlässliche Mehrgeräte-Synchronisation auch bei pausierten Mobil-WebSockets.\n\ndrop trigger if exists live_refresh_player_progress on public.player_progress;\ncreate trigger live_refresh_player_progress\nafter insert or update or delete on public.player_progress\nfor each row execute function public.emit_live_game_refresh();\n\ncomment on trigger live_refresh_player_progress on public.player_progress is\n  'Informiert andere Geräte über geänderte Spieleransichten; der Client nutzt zusätzlich ein Polling-Fallback.';\n''')
-          PY
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/live/useLiveGame.ts supabase/migrations/20260724002000_reliable_live_sync.sql
-          if git diff --cached --quiet; then
-            echo "Synchronisationspatch bereits vorhanden."
-          else
-            git commit -m "[skip ci] Make live synchronization resilient"
-            git push origin main
-          fi
+          fetch-depth: 0
 
       - name: Validate required secrets
+        id: secrets
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -116,46 +42,19 @@ jobs:
           test -n "$SUPABASE_PROJECT_ID" || { echo "SUPABASE_PROJECT_ID fehlt"; exit 1; }
 
       - name: Install Supabase CLI
+        if: steps.secrets.outcome == 'success'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Initialize CLI configuration
+        if: steps.secrets.outcome == 'success'
         run: supabase init --force
-
-      - name: Normalize live migration source
-        shell: bash
-        run: |
-          set -euo pipefail
-          migration="supabase/migrations/20260724000000_live_game_instances.sql"
-          python <<'PY'
-          from pathlib import Path
-          path = Path("supabase/migrations/20260724000000_live_game_instances.sql")
-          text = path.read_text()
-          old = "  current_role public.game_role\n"
-          new = '  "current_role" public.game_role\n'
-          if old in text:
-              path.write_text(text.replace(old, new, 1))
-          elif new not in text:
-              raise SystemExit("Die erwartete current_role-Deklaration wurde nicht gefunden.")
-          PY
-          grep -n '"current_role" public.game_role' "$migration"
-
-      - name: Persist normalized migration source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- supabase/migrations/20260724000000_live_game_instances.sql; then
-            git add supabase/migrations/20260724000000_live_game_instances.sql
-            git commit -m "[skip ci] Quote reserved live progress column"
-            git push origin main
-          fi
 
       - name: Link remote project
         id: link
         continue-on-error: true
+        if: steps.secrets.outcome == 'success'
         shell: bash
         run: |
           set -o pipefail
@@ -182,6 +81,7 @@ jobs:
       - name: Record database deployment status
         if: always()
         env:
+          SECRETS_OUTCOME: ${{ steps.secrets.outcome }}
           LINK_OUTCOME: ${{ steps.link.outcome }}
           PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
           APPLY_OUTCOME: ${{ steps.apply.outcome }}
@@ -193,7 +93,7 @@ jobs:
           git pull --rebase origin main
 
           status="erfolgreich"
-          if [[ "$LINK_OUTCOME" != "success" || "$PREVIEW_OUTCOME" != "success" || "$APPLY_OUTCOME" != "success" ]]; then
+          if [[ "$SECRETS_OUTCOME" != "success" || "$LINK_OUTCOME" != "success" || "$PREVIEW_OUTCOME" != "success" || "$APPLY_OUTCOME" != "success" ]]; then
             status="fehlgeschlagen"
           fi
 
@@ -203,6 +103,7 @@ jobs:
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $GITHUB_SHA"
+            echo "- Secrets geprüft: $SECRETS_OUTCOME"
             echo "- Projektverknüpfung: $LINK_OUTCOME"
             echo "- Migrationsvorschau: $PREVIEW_OUTCOME"
             echo "- Migration angewendet: $APPLY_OUTCOME"
@@ -222,12 +123,12 @@ jobs:
 
           git add docs/SUPABASE_DEPLOY_STATUS.md
           if git diff --cached --quiet; then
-            echo "Deploymentstatus ist unverändert."
+            echo "Datenbankstatus ist unverändert."
           else
             git commit -m "[skip ci] Record Supabase deployment status"
             git push origin main
           fi
 
-      - name: Fail unsuccessful deployment
-        if: always() && (steps.link.outcome != 'success' || steps.preview.outcome != 'success' || steps.apply.outcome != 'success')
+      - name: Fail unsuccessful database deployment
+        if: always() && (steps.secrets.outcome != 'success' || steps.link.outcome != 'success' || steps.preview.outcome != 'success' || steps.apply.outcome != 'success')
         run: exit 1
