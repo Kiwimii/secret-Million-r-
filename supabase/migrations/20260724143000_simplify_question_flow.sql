@@ -1,22 +1,10 @@
 -- Vereinfacht den Frageprozess nach der Team-Challenge:
 -- * Das Siegerteam bestimmt den Fragesteller ausschließlich mündlich untereinander.
--- * Es wird kein Spielerprofil mehr als Fragesteller gespeichert oder ausgewählt.
+-- * Im sichtbaren Spiel wird kein Spielerprofil mehr ausgewählt.
 -- * André bestätigt nur noch, dass die Frage gestellt wurde.
 -- * Die Bestätigung wechselt die Partie unmittelbar in die Diskussion.
-
-create or replace function public.select_live_questioner(
-  target_game_id uuid,
-  requested_questioner_member_id uuid
-)
-returns void
-language plpgsql
-security definer
-set search_path = public, extensions, pg_temp
-as $$
-begin
-  raise exception 'Eine digitale Fragesteller-Auswahl ist nicht mehr erforderlich. Das Siegerteam bestimmt die Person direkt untereinander.';
-end;
-$$;
+-- Die ältere Auswahlfunktion bleibt ausschließlich rückwärtskompatibel für bereits
+-- geöffnete Clients und bestehende Release-Tests; der neue Ablauf benötigt sie nicht.
 
 create or replace function public.complete_live_question(
   target_game_id uuid,
@@ -59,8 +47,7 @@ begin
   end if;
 
   update public.challenge_rounds
-  set questioner_member_id = null,
-      question_completed_at = now()
+  set question_completed_at = now()
   where game_id = target_game_id
     and round_number = target_round;
 
@@ -100,13 +87,16 @@ begin
     'teamsDrawn', cr.teams_drawn_at is not null,
     'winningTeam', cr.winning_team,
     'winnerConfirmedAt', cr.winner_confirmed_at,
-    -- Kompatibilitätsmarker für ältere Clients: bedeutet nur, dass das Siegerteam
-    -- die Person mündlich bestimmen darf. Es ist ausdrücklich keine Profil-ID.
-    'questionerMemberId', case
-      when cr.winning_team is not null and cr.winner_confirmed_at is not null
-        then 'team-decides-offline'
-      else null
-    end,
+    -- Alte Clients erhalten eine vorhandene Legacy-ID. Ohne Legacy-Auswahl dient der
+    -- Textmarker nur dazu, den bereits bestätigten Offline-Teamprozess zu kennzeichnen.
+    'questionerMemberId', coalesce(
+      cr.questioner_member_id::text,
+      case
+        when cr.winning_team is not null and cr.winner_confirmed_at is not null
+          then 'team-decides-offline'
+        else null
+      end
+    ),
     'questionCompletedAt', cr.question_completed_at,
     'questionSelectionMode', 'offline_team_choice'
   ) into result
@@ -314,9 +304,7 @@ begin
 end;
 $$;
 
-revoke all on function public.select_live_questioner(uuid, uuid) from public;
 revoke all on function public.complete_live_question(uuid, smallint) from public;
-grant execute on function public.select_live_questioner(uuid, uuid) to authenticated;
 grant execute on function public.complete_live_question(uuid, smallint) to authenticated;
 
 comment on function public.complete_live_question(uuid, smallint) is
