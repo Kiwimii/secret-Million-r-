@@ -1,20 +1,24 @@
-name: Verify visual experience V3
+name: Verify visual experience V4
 
 on:
   workflow_run:
     workflows: ["Deploy browser test"]
     types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-visual-v2.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: verify-visual-v3
+  group: verify-visual-v4
   cancel-in-progress: true
 
 jobs:
-  verify-visual-v3:
+  verify-visual-v4:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -27,7 +31,7 @@ jobs:
         with:
           ref: main
 
-      - name: Verify deployed V3 marker
+      - name: Verify deployed restored-core markers
         id: visual
         continue-on-error: true
         shell: bash
@@ -36,12 +40,14 @@ jobs:
           for attempt in $(seq 1 36); do
             if curl --fail --silent --show-error --location "$LIVE_URL" --output live-page.html; then
               if grep -qi 'data-visual-version="midnight-fortune-v3"' live-page.html \
-                 && grep -qi 'data-live-flow="authoritative"' live-page.html; then
-                echo "Midnight Fortune V3 mit verbindlichem Live-Ablauf ist öffentlich ausgeliefert."
+                 && grep -qi 'data-live-flow="authoritative"' live-page.html \
+                 && grep -qi 'data-core-game-flow="restored-v1"' live-page.html \
+                 && grep -qi 'data-player-resume-version="profile-dropdown-v1"' live-page.html; then
+                echo "V4 ist öffentlich: V3-Design, verbindlicher Ablauf, wiederhergestellter Spielkern und Profil-Wiedereintritt."
                 exit 0
               fi
             fi
-            echo "V3-Deployment noch nicht sichtbar ($attempt/36)."
+            echo "V4-Deployment noch nicht vollständig sichtbar ($attempt/36)."
             sleep 10
           done
           exit 1
@@ -59,18 +65,20 @@ jobs:
           status="erfolgreich"
           if [[ "$VISUAL_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
           {
-            echo "# Visual-Experience-V3-Prüfung"
+            echo "# Visual-Experience-V4-Prüfung"
             echo
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $RELEASE_SHA"
             echo "- Öffentliche Seite: $LIVE_URL"
-            echo "- V3-Kennung und verbindlicher Live-Ablauf im HTML: $VISUAL_OUTCOME"
+            echo "- V3-Design und verbindlicher Live-Ablauf: $VISUAL_OUTCOME"
+            echo "- Wiederhergestellter Kernablauf im HTML: $VISUAL_OUTCOME"
+            echo "- Profil-Wiedereintritt im HTML: $VISUAL_OUTCOME"
           } > docs/VISUAL_RELEASE_STATUS.md
           git add docs/VISUAL_RELEASE_STATUS.md
-          git commit -m "[skip ci] Record visual V3 release status" || exit 0
+          git commit -m "[skip ci] Record visual V4 release status" || exit 0
           git push origin main
 
-      - name: Fail missing V3 release
+      - name: Fail missing V4 release
         if: always() && steps.visual.outcome != 'success'
         run: exit 1
