@@ -17,10 +17,10 @@ begin
 
   return query
   select
-    rounds.round_number,
+    rounds.round_number::smallint,
     mission.catalog_id,
     advantage.catalog_id
-  from generate_series(1, 4)::smallint as rounds(round_number)
+  from generate_series(1, 4) as rounds(round_number)
   left join public.round_mission_selections mission
     on mission.game_id = target_game_id
    and mission.round_number = rounds.round_number
