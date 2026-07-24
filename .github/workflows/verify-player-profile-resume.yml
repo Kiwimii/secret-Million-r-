@@ -1,0 +1,217 @@
+name: Verify player profile resume
+
+on:
+  workflow_run:
+    workflows: ["Deploy Supabase Database"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-player-profile-resume.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-player-profile-resume
+  cancel-in-progress: true
+
+jobs:
+  verify-resume:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve Supabase browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Verify profile dropdown and PIN resume
+        id: resume
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE' 2>&1 | tee player-resume.log
+          const { createClient } = require('@supabase/supabase-js');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const makeClient = () => createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false } },
+          );
+
+          async function authenticate(client) {
+            const result = await client.auth.signInAnonymously();
+            if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+
+          async function cleanup(host, gameId) {
+            const result = await host.rpc('delete_own_live_game', { target_game_id: gameId });
+            if (result.error) throw result.error;
+          }
+
+          async function runAttempt() {
+            const host = makeClient();
+            const originalDevice = makeClient();
+            const resumeDevice = makeClient();
+            let gameId;
+            try {
+              await authenticate(host);
+              const created = await host.rpc('create_live_game', {
+                game_title: `Wiedereintritt-Test ${Date.now()}`,
+                host_pin: '2486',
+              });
+              if (created.error) throw created.error;
+              const game = created.data?.[0];
+              if (!game?.game_id || !game?.join_code) throw new Error('Testpartie konnte nicht erstellt werden.');
+              gameId = game.game_id;
+              const joinCode = String(game.join_code);
+
+              await authenticate(originalDevice);
+              const profileName = `Wiedereintritt-${String(Date.now()).slice(-6)}`;
+              const joined = await originalDevice.rpc('join_or_resume_live_game', {
+                raw_join_code: joinCode,
+                requested_display_name: profileName,
+                player_pin: '1357',
+                requested_avatar_path: null,
+              });
+              if (joined.error || !joined.data?.[0]?.member_id) throw joined.error ?? new Error('Testprofil konnte nicht erstellt werden.');
+              const memberId = joined.data[0].member_id;
+
+              await authenticate(resumeDevice);
+              const profiles = await resumeDevice.rpc('list_live_game_profiles', {
+                raw_join_code: joinCode,
+              });
+              if (profiles.error) throw profiles.error;
+              const listed = profiles.data?.find((profile) => profile.member_id === memberId);
+              if (!listed || listed.display_name !== profileName) {
+                throw new Error('Das vorhandene Profil wurde nicht in der Wiedereintrittsliste gefunden.');
+              }
+
+              const wrongPin = await resumeDevice.rpc('resume_live_player_by_member', {
+                raw_join_code: joinCode,
+                target_member_id: memberId,
+                player_pin: '9999',
+              });
+              if (!wrongPin.error) throw new Error('Ein falscher Profil-PIN wurde unerwartet akzeptiert.');
+
+              const resumed = await resumeDevice.rpc('resume_live_player_by_member', {
+                raw_join_code: joinCode,
+                target_member_id: memberId,
+                player_pin: '1357',
+              });
+              if (resumed.error || resumed.data?.[0]?.member_id !== memberId || resumed.data?.[0]?.resumed !== true) {
+                throw resumed.error ?? new Error('Das ausgewählte Profil konnte nicht wieder geöffnet werden.');
+              }
+
+              const lookup = await resumeDevice.rpc('lookup_live_game', { raw_join_code: joinCode });
+              if (lookup.error || lookup.data?.[0]?.member_id !== memberId) {
+                throw lookup.error ?? new Error('Das wieder geöffnete Profil ist nicht mit dem neuen Gerät verbunden.');
+              }
+
+              await cleanup(host, gameId);
+              gameId = undefined;
+              console.log('Wiedereintritt erfolgreich: Code, Profildropdown, falscher PIN und korrekter PIN wurden geprüft.');
+            } catch (error) {
+              if (gameId) {
+                try { await cleanup(host, gameId); } catch {}
+              }
+              throw error;
+            }
+          }
+
+          async function main() {
+            let lastError;
+            for (let attempt = 1; attempt <= 6; attempt += 1) {
+              try {
+                await runAttempt();
+                return;
+              } catch (error) {
+                lastError = error;
+                console.log(`Versuch ${attempt}/6 fehlgeschlagen: ${error?.message ?? error}`);
+                await sleep(5000);
+              }
+            }
+            throw lastError ?? new Error('Wiedereintrittstest fehlgeschlagen.');
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Record player resume status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          RESUME_OUTCOME: ${{ steps.resume.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$RESUME_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Spieler-Wiedereintritt-Prüfung"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Code, Profildropdown und PIN-Wiedereintritt: $RESUME_OUTCOME"
+            echo
+            echo "## Letzte Diagnosezeilen"
+            echo '```text'
+            if [[ -f player-resume.log ]]; then tail -n 60 player-resume.log; else echo "Keine Testausgabe vorhanden."; fi
+            echo '```'
+          } > docs/PLAYER_RESUME_STATUS.md
+          git add docs/PLAYER_RESUME_STATUS.md
+          git commit -m "[skip ci] Record player profile resume status" || exit 0
+          git push origin main
+
+      - name: Fail unsuccessful resume verification
+        if: always() && (steps.config.outcome != 'success' || steps.resume.outcome != 'success')
+        run: exit 1
