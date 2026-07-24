@@ -1,4 +1,4 @@
-name: Verify live game creation
+name: Verify authoritative live game flow
 
 on:
   workflow_run:
@@ -17,7 +17,7 @@ jobs:
   smoke-test:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -61,7 +61,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
-      - name: Create and operate a complete live game
+      - name: Operate the complete authoritative live flow
         id: smoke
         continue-on-error: true
         shell: bash
@@ -78,107 +78,261 @@ jobs:
 
           async function authenticate(client) {
             const result = await client.auth.signInAnonymously();
-            if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+            if (result.error || !result.data.user) {
+              throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+            }
+          }
+
+          async function rpc(client, name, args) {
+            const result = await client.rpc(name, args);
+            if (result.error) throw result.error;
+            return result.data;
+          }
+
+          async function lookup(client, joinCode) {
+            const data = await rpc(client, 'lookup_live_game', { raw_join_code: joinCode });
+            const row = Array.isArray(data) ? data[0] : undefined;
+            if (!row) throw new Error('Live-Partie konnte nicht geladen werden.');
+            return row;
           }
 
           async function deleteGame(host, gameId) {
-            const cleanup = await host.rpc('delete_own_live_game', {
-              target_game_id: gameId,
+            await rpc(host, 'delete_own_live_game', { target_game_id: gameId });
+          }
+
+          async function joinPlayer(client, joinCode, suffix, pin) {
+            await authenticate(client);
+            const name = `Testspieler-${suffix}-${String(Date.now()).slice(-5)}`;
+            const data = await rpc(client, 'join_or_resume_live_game', {
+              raw_join_code: joinCode,
+              requested_display_name: name,
+              player_pin: pin,
+              requested_avatar_path: null,
             });
-            if (cleanup.error) throw cleanup.error;
+            const row = Array.isArray(data) ? data[0] : undefined;
+            if (!row?.member_id) throw new Error(`Spielerbeitritt ${suffix} fehlgeschlagen.`);
+            const resumed = await rpc(client, 'join_or_resume_live_game', {
+              raw_join_code: joinCode,
+              requested_display_name: name,
+              player_pin: pin,
+              requested_avatar_path: null,
+            });
+            if (!Array.isArray(resumed) || resumed[0]?.resumed !== true) {
+              throw new Error(`Wiederbeitritt ${suffix} fehlgeschlagen.`);
+            }
+            return { memberId: row.member_id, name };
+          }
+
+          async function setPhase(host, gameId, joinCode, phase, round = 1) {
+            const state = await lookup(host, joinCode);
+            await rpc(host, 'set_live_game_phase', {
+              target_game_id: gameId,
+              target_round: round,
+              target_phase: phase,
+              expected_revision: state.revision,
+            });
           }
 
           async function runAttempt() {
             const host = makeClient();
-            const player = makeClient();
+            const playerAClient = makeClient();
+            const playerBClient = makeClient();
             let gameId;
             try {
               await authenticate(host);
-              const created = await host.rpc('create_live_game', {
-                game_title: `Automatischer Live-Test ${Date.now()}`,
+              const created = await rpc(host, 'create_live_game', {
+                game_title: `Autoritativer Live-Test ${Date.now()}`,
                 host_pin: '2486',
               });
-              if (created.error) throw created.error;
-              const game = Array.isArray(created.data) ? created.data[0] : undefined;
+              const game = Array.isArray(created) ? created[0] : undefined;
               if (!game?.game_id || !/^\d{6}$/.test(String(game.join_code ?? ''))) {
                 throw new Error('Partie oder Einladungscode fehlt.');
               }
               gameId = game.game_id;
               const joinCode = String(game.join_code);
 
-              const hostResume = await host.rpc('resume_live_host', {
+              const hostResume = await rpc(host, 'resume_live_host', {
                 raw_join_code: joinCode,
                 host_pin: '2486',
               });
-              if (hostResume.error || hostResume.data !== gameId) throw hostResume.error ?? new Error('Host-PIN-Prüfung fehlgeschlagen.');
+              if (hostResume !== gameId) throw new Error('André-PIN-Prüfung fehlgeschlagen.');
 
-              await authenticate(player);
-              const playerName = `Testspieler-${String(Date.now()).slice(-6)}`;
-              const joined = await player.rpc('join_or_resume_live_game', {
-                raw_join_code: joinCode,
-                requested_display_name: playerName,
-                player_pin: '1357',
-                requested_avatar_path: null,
+              const playerA = await joinPlayer(playerAClient, joinCode, 'A', '1357');
+              const playerB = await joinPlayer(playerBClient, joinCode, 'B', '9753');
+
+              const millionaireMemberId = await rpc(host, 'draw_random_millionaire', {
+                target_game_id: gameId,
+                excluded_member_id: null,
               });
-              if (joined.error || !Array.isArray(joined.data) || !joined.data[0]?.member_id) throw joined.error ?? new Error('Spielerbeitritt fehlgeschlagen.');
+              if (![playerA.memberId, playerB.memberId].includes(millionaireMemberId)) {
+                throw new Error('Millionär wurde keinem aktiven Spieler zugeteilt.');
+              }
 
-              const resumed = await player.rpc('join_or_resume_live_game', {
-                raw_join_code: joinCode,
-                requested_display_name: playerName,
-                player_pin: '1357',
-                requested_avatar_path: null,
-              });
-              if (resumed.error || resumed.data?.[0]?.resumed !== true) throw resumed.error ?? new Error('Spieler-PIN-Prüfung fehlgeschlagen.');
-
-              const missionSelection = await host.rpc('select_live_round_mission', {
+              await rpc(host, 'select_live_round_mission', {
                 target_game_id: gameId,
                 target_round: 1,
                 mission_catalog_id: 'release-smoke-mission',
                 mission_title: 'Automatische Testmission',
-                mission_task: 'Prüft die Auswahl einer Mission durch die Spielleitung.',
-                mission_success_criteria: 'Die Auswahl ist gespeichert und wieder lesbar.',
+                mission_task: 'Prüft die parallele geheime Mission.',
+                mission_success_criteria: 'André markiert die Mission erfolgreich.',
                 mission_time_window: '1 Minute',
               });
-              if (missionSelection.error) throw missionSelection.error;
 
-              const missionRead = await host
-                .from('round_mission_selections')
-                .select('catalog_id')
-                .eq('game_id', gameId)
-                .eq('round_number', 1)
-                .maybeSingle();
-              if (missionRead.error || missionRead.data?.catalog_id !== 'release-smoke-mission') {
-                throw missionRead.error ?? new Error('Die ausgewählte Mission konnte vom Host nicht gelesen werden.');
-              }
+              await rpc(host, 'select_live_round_advantage', {
+                target_game_id: gameId,
+                target_round: 1,
+                advantage_catalog_id: 'r1-double-vote',
+                advantage_effect: 'double_vote',
+                advantage_title: 'Echo der Krone',
+                advantage_description: 'Die Stimme des Millionärs zählt zweimal.',
+                advantage_player_instructions: 'Stimme normal ab; das Echo wird bei der Auswertung ergänzt.',
+                advantage_host_instructions: 'Addiere eine Stimme auf das Ziel des Millionärs.',
+                advantage_limit: 'Nur Hauptabstimmung.',
+                advantage_selection_mode: 'none',
+              });
 
-              const challengeSelection = await host.rpc('select_live_challenge', {
+              await rpc(host, 'select_live_challenge', {
                 target_game_id: gameId,
                 target_round: 1,
                 challenge_catalog_id: 'release-smoke-challenge',
                 challenge_title: 'Automatische Testchallenge',
                 challenge_public_name: 'Testchallenge',
-                challenge_player_briefing: 'Prüft die Challenge-Auswahl durch die Spielleitung.',
+                challenge_player_briefing: 'Prüft Teams, Sieger und Fragesteller.',
                 challenge_host_instructions: 'Nur für den automatischen Release-Test.',
                 challenge_duration: '1 Minute',
                 challenge_material: [],
-                challenge_win_condition: 'Die Challenge ist gespeichert und wieder lesbar.',
+                challenge_win_condition: 'Die Datenbank bestätigt den Ablauf.',
                 challenge_safety_note: 'Keine reale Durchführung.',
               });
-              if (challengeSelection.error) throw challengeSelection.error;
 
-              const challengeRead = await host
-                .from('challenge_rounds')
-                .select('catalog_id')
-                .eq('game_id', gameId)
-                .eq('round_number', 1)
-                .maybeSingle();
-              if (challengeRead.error || challengeRead.data?.catalog_id !== 'release-smoke-challenge') {
-                throw challengeRead.error ?? new Error('Die ausgewählte Challenge konnte vom Host nicht gelesen werden.');
+              let blockedWithoutTeams = false;
+              try {
+                await setPhase(host, gameId, joinCode, 'challenge');
+              } catch (error) {
+                blockedWithoutTeams = /Teams|Teamzuteilung|Challenge/.test(error.message ?? String(error));
               }
+              if (!blockedWithoutTeams) {
+                throw new Error('Challenge konnte unerlaubt vor der Teamzuteilung starten.');
+              }
+
+              const assignmentCount = await rpc(host, 'draw_live_challenge_teams', {
+                target_game_id: gameId,
+                target_round: 1,
+              });
+              if (Number(assignmentCount) !== 2) throw new Error('Teamzuteilung ist unvollständig.');
+
+              await setPhase(host, gameId, joinCode, 'challenge');
+
+              await rpc(playerAClient, 'update_own_player_progress', {
+                target_game_id: gameId,
+                requested_screen_key: 'challenge',
+                requested_step_key: 'challenge_opened',
+                requested_phase_seen: 'challenge',
+                requested_role_revealed: null,
+                requested_mission_opened: null,
+                requested_advantage_opened: null,
+                requested_challenge_opened: true,
+                requested_vote_submitted: null,
+                requested_role_decision_submitted: null,
+              });
+              const progress = await rpc(host, 'get_host_player_progress', { target_game_id: gameId });
+              const playerAProgress = progress.find((entry) => entry.member_id === playerA.memberId);
+              if (!playerAProgress?.challenge_briefing_opened) {
+                throw new Error('Die bestätigte Challenge wurde nicht sichtbar gespeichert.');
+              }
+
+              const lobby = await rpc(host, 'get_public_lobby_members', { target_game_id: gameId });
+              const winningEntry = lobby.find((entry) => entry.challenge_team === 'azur') ?? lobby[0];
+              if (!winningEntry?.challenge_team) throw new Error('Kein Gewinnerteam bestimmbar.');
+              const winningTeam = winningEntry.challenge_team;
+              await rpc(host, 'confirm_live_challenge_winner', {
+                target_game_id: gameId,
+                target_round: 1,
+                winning_team_code: winningTeam,
+              });
+
+              await setPhase(host, gameId, joinCode, 'question');
+
+              const winningClient = winningEntry.member_id === playerA.memberId
+                ? playerAClient
+                : playerBClient;
+              await rpc(winningClient, 'select_live_questioner', {
+                target_game_id: gameId,
+                requested_questioner_member_id: winningEntry.member_id,
+              });
+              await rpc(host, 'complete_live_question', {
+                target_game_id: gameId,
+                target_round: 1,
+              });
+
+              const publicFlow = await rpc(host, 'get_live_public_round_flow', {
+                target_game_id: gameId,
+              });
+              if (!publicFlow?.teamsDrawn || publicFlow.winningTeam !== winningTeam
+                  || publicFlow.questionerMemberId !== winningEntry.member_id
+                  || !publicFlow.questionCompletedAt) {
+                throw new Error('Challenge-, Sieger- oder Fragenablauf wurde nicht vollständig gespeichert.');
+              }
+
+              await rpc(host, 'mark_live_mission_status', {
+                target_game_id: gameId,
+                target_round: 1,
+                requested_status: 'completed',
+              });
+              await rpc(host, 'configure_live_advantage', {
+                target_game_id: gameId,
+                target_round: 1,
+                requested_target_member_id: null,
+                requested_secondary_target_member_id: null,
+                requested_source_target_member_id: null,
+                requested_voter_member_id: null,
+                requested_tie_opponent_member_id: null,
+              });
+
+              const hostControl = await rpc(host, 'get_live_host_round_control', {
+                target_game_id: gameId,
+              });
+              if (hostControl?.mission?.status !== 'completed'
+                  || hostControl?.advantage?.effect !== 'double_vote'
+                  || !hostControl?.advantage?.usedAt
+                  || hostControl?.advantage?.expiredAt) {
+                throw new Error('Missionserfolg hat den geheimen Vorteil nicht korrekt aktiviert.');
+              }
+
+              const millionaireClient = millionaireMemberId === playerA.memberId
+                ? playerAClient
+                : playerBClient;
+              const privateState = await rpc(millionaireClient, 'get_live_private_state', {
+                target_game_id: gameId,
+              });
+              if (privateState?.mission?.catalog_id !== 'release-smoke-mission'
+                  || privateState?.advantage?.catalog_id !== 'r1-double-vote') {
+                throw new Error('Mission und Vorteil wurden dem Millionär nicht gemeinsam angezeigt.');
+              }
+
+              await rpc(host, 'host_complete_player_step', {
+                target_game_id: gameId,
+                target_member_id: playerB.memberId,
+                requested_step: 'challenge',
+              });
+              const overriddenProgress = await rpc(host, 'get_host_player_progress', {
+                target_game_id: gameId,
+              });
+              if (!overriddenProgress.find((entry) => entry.member_id === playerB.memberId)?.challenge_briefing_opened) {
+                throw new Error('Andrés manuelle Spielerfreigabe wurde nicht gespeichert.');
+              }
+
+              await rpc(host, 'force_live_game_phase', {
+                target_game_id: gameId,
+                target_round: 1,
+                target_phase: 'voting',
+              });
+              const forcedState = await lookup(host, joinCode);
+              if (forcedState.phase !== 'voting') throw new Error('Notfall-Phasensteuerung fehlgeschlagen.');
 
               await deleteGame(host, gameId);
               gameId = undefined;
-              console.log('Live-Partie, Host- und Spieler-PIN sowie Mission- und Challenge-Auswahl erfolgreich geprüft.');
+              console.log('Vollständiger Ablauf erfolgreich: Wiederbeitritt, Teams, Challenge, Sieger, Fragesteller, Frage, Mission, Vorteil und Notfallsteuerung.');
             } catch (error) {
               if (gameId) {
                 try { await deleteGame(host, gameId); } catch {}
@@ -199,7 +353,7 @@ jobs:
                 await sleep(5000);
               }
             }
-            throw lastError ?? new Error('Live-Spieltest fehlgeschlagen.');
+            throw lastError ?? new Error('Autoritativer Live-Spieltest fehlgeschlagen.');
           }
 
           main().catch((error) => {
@@ -222,25 +376,23 @@ jobs:
           status="erfolgreich"
           if [[ "$CONFIG_OUTCOME" != "success" || "$SMOKE_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
           {
-            echo "# Live-Partie-Smoke-Test"
+            echo "# Autoritativer Live-Partie-Smoke-Test"
             echo
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $TESTED_SHA"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
-            echo "- Partie, PINs sowie Mission- und Challenge-Auswahl: $SMOKE_OUTCOME"
+            echo "- Vollständiger Runden-, Missions-, Vorteil- und Notfallablauf: $SMOKE_OUTCOME"
             echo
             echo "## Letzte Diagnosezeilen"
             echo '```text'
-            if [[ -f smoke.log ]]; then tail -n 80 smoke.log; else echo "Keine Smoke-Test-Ausgabe vorhanden."; fi
+            if [[ -f smoke.log ]]; then tail -n 100 smoke.log; else echo "Keine Smoke-Test-Ausgabe vorhanden."; fi
             echo '```'
           } > docs/LIVE_GAME_SMOKE_STATUS.md
           git add docs/LIVE_GAME_SMOKE_STATUS.md
-          git commit -m "[skip ci] Record live game creation smoke test" || exit 0
+          git commit -m "[skip ci] Record authoritative live game smoke test" || exit 0
           git push origin main
 
       - name: Fail unsuccessful smoke test
         if: always() && (steps.config.outcome != 'success' || steps.smoke.outcome != 'success')
         run: exit 1
-
-# Manual production retest requested on 2026-07-24.
