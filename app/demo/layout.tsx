@@ -8,6 +8,7 @@ import "./live-game.css";
 import "./midnight-fortune.css";
 import "./midnight-fortune-v2.css";
 import "./midnight-fortune-v2-compat.css";
+import "./live-flow-control.css";
 
 export default function DemoLayout({
   children,
