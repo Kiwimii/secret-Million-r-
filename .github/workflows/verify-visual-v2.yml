@@ -1,4 +1,4 @@
-name: Verify visual experience V7
+name: Verify visual experience V8
 
 on:
   workflow_run:
@@ -14,11 +14,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: verify-visual-v7
+  group: verify-visual-v8
   cancel-in-progress: true
 
 jobs:
-  verify-visual-v7:
+  verify-visual-v8:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -31,7 +31,7 @@ jobs:
         with:
           ref: main
 
-      - name: Verify deployed host-selected advantage marker
+      - name: Verify deployed integrated André overview marker
         id: visual
         continue-on-error: true
         shell: bash
@@ -44,12 +44,12 @@ jobs:
                  && grep -qi 'data-core-game-flow="restored-v1"' live-page.html \
                  && grep -qi 'data-player-resume-version="profile-dropdown-v2"' live-page.html \
                  && grep -qi 'data-question-flow-version="offline-team-choice-v1"' live-page.html \
-                 && grep -qi 'data-advantage-flow-version="host-selected-v1"' live-page.html; then
-                echo "V7 ist öffentlich: André legt Mission und Vorteilsart fest; der Millionär wendet den festgelegten Vorteil an."
+                 && grep -qi 'data-advantage-flow-version="host-selected-integrated-v2"' live-page.html; then
+                echo "V8 ist öffentlich: Mission und Vorteil sind direkt in Andrés Gesamtübersicht integriert."
                 exit 0
               fi
             fi
-            echo "V7-Deployment noch nicht vollständig sichtbar ($attempt/36)."
+            echo "V8-Deployment noch nicht vollständig sichtbar ($attempt/36)."
             sleep 10
           done
           exit 1
@@ -67,7 +67,7 @@ jobs:
           status="erfolgreich"
           if [[ "$VISUAL_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
           {
-            echo "# Visual-Experience-V7-Prüfung"
+            echo "# Visual-Experience-V8-Prüfung"
             echo
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -77,12 +77,12 @@ jobs:
             echo "- Wiederhergestellter Kernablauf im HTML: $VISUAL_OUTCOME"
             echo "- Sichtbare Startseiten-Wiedereintrittsversion: $VISUAL_OUTCOME"
             echo "- Vereinfachter Frageablauf ohne Profilwahl: $VISUAL_OUTCOME"
-            echo "- Von André festgelegter Vorteilsablauf: $VISUAL_OUTCOME"
+            echo "- Mission und Vorteil direkt in Andrés Übersicht: $VISUAL_OUTCOME"
           } > docs/VISUAL_RELEASE_STATUS.md
           git add docs/VISUAL_RELEASE_STATUS.md
-          git commit -m "[skip ci] Record visual V7 release status" || exit 0
+          git commit -m "[skip ci] Record visual V8 release status" || exit 0
           git push origin main
 
-      - name: Fail missing V7 release
+      - name: Fail missing V8 release
         if: always() && steps.visual.outcome != 'success'
         run: exit 1
