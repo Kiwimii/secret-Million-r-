@@ -6,7 +6,7 @@ function unique(values: readonly string[]) {
   return new Set(values).size === values.length;
 }
 
-describe("erweiterte Spielkataloge", () => {
+describe("Spielkataloge", () => {
   it("enthält genau 16 Challenges mit vollständigen Beschreibungen", () => {
     expect(CHALLENGES).toHaveLength(16);
     expect(CHALLENGES.filter((entry) => entry.original)).toHaveLength(4);
@@ -21,10 +21,13 @@ describe("erweiterte Spielkataloge", () => {
     }
   });
 
-  it("enthält genau acht bekannte und acht neue Vorteile", () => {
-    expect(ADVANTAGES).toHaveLength(16);
-    expect(ADVANTAGES.filter((entry) => !entry.isNew)).toHaveLength(8);
-    expect(ADVANTAGES.filter((entry) => entry.isNew)).toHaveLength(8);
+  it("beschränkt die Millionärsvorteile bewusst auf drei klare Abstimmungsmechaniken", () => {
+    expect(ADVANTAGES).toHaveLength(3);
+    expect(ADVANTAGES.map((entry) => entry.effect)).toEqual([
+      "double_vote",
+      "triple_vote",
+      "redirect_vote",
+    ]);
     expect(unique(ADVANTAGES.map((entry) => entry.id))).toBe(true);
     for (const advantage of ADVANTAGES) {
       expect(advantage.playerInstructions.length).toBeGreaterThan(40);
