@@ -61,7 +61,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
-      - name: Create and reopen a complete live game
+      - name: Create and operate a complete live game
         id: smoke
         continue-on-error: true
         shell: bash
@@ -130,9 +130,55 @@ jobs:
               });
               if (resumed.error || resumed.data?.[0]?.resumed !== true) throw resumed.error ?? new Error('Spieler-PIN-Prüfung fehlgeschlagen.');
 
+              const missionSelection = await host.rpc('select_live_round_mission', {
+                target_game_id: gameId,
+                target_round: 1,
+                mission_catalog_id: 'release-smoke-mission',
+                mission_title: 'Automatische Testmission',
+                mission_task: 'Prüft die Auswahl einer Mission durch die Spielleitung.',
+                mission_success_criteria: 'Die Auswahl ist gespeichert und wieder lesbar.',
+                mission_time_window: '1 Minute',
+              });
+              if (missionSelection.error) throw missionSelection.error;
+
+              const missionRead = await host
+                .from('round_mission_selections')
+                .select('catalog_id')
+                .eq('game_id', gameId)
+                .eq('round_number', 1)
+                .maybeSingle();
+              if (missionRead.error || missionRead.data?.catalog_id !== 'release-smoke-mission') {
+                throw missionRead.error ?? new Error('Die ausgewählte Mission konnte vom Host nicht gelesen werden.');
+              }
+
+              const challengeSelection = await host.rpc('select_live_challenge', {
+                target_game_id: gameId,
+                target_round: 1,
+                challenge_catalog_id: 'release-smoke-challenge',
+                challenge_title: 'Automatische Testchallenge',
+                challenge_public_name: 'Testchallenge',
+                challenge_player_briefing: 'Prüft die Challenge-Auswahl durch die Spielleitung.',
+                challenge_host_instructions: 'Nur für den automatischen Release-Test.',
+                challenge_duration: '1 Minute',
+                challenge_material: [],
+                challenge_win_condition: 'Die Challenge ist gespeichert und wieder lesbar.',
+                challenge_safety_note: 'Keine reale Durchführung.',
+              });
+              if (challengeSelection.error) throw challengeSelection.error;
+
+              const challengeRead = await host
+                .from('challenge_rounds')
+                .select('catalog_id')
+                .eq('game_id', gameId)
+                .eq('round_number', 1)
+                .maybeSingle();
+              if (challengeRead.error || challengeRead.data?.catalog_id !== 'release-smoke-challenge') {
+                throw challengeRead.error ?? new Error('Die ausgewählte Challenge konnte vom Host nicht gelesen werden.');
+              }
+
               await deleteGame(host, gameId);
               gameId = undefined;
-              console.log('Echte Live-Partie inklusive Host- und Spieler-PIN erfolgreich geprüft.');
+              console.log('Live-Partie, Host- und Spieler-PIN sowie Mission- und Challenge-Auswahl erfolgreich geprüft.');
             } catch (error) {
               if (gameId) {
                 try { await deleteGame(host, gameId); } catch {}
@@ -182,7 +228,7 @@ jobs:
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $TESTED_SHA"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
-            echo "- Partie erstellen, Host-PIN, Spielerbeitritt und Spieler-PIN: $SMOKE_OUTCOME"
+            echo "- Partie, PINs sowie Mission- und Challenge-Auswahl: $SMOKE_OUTCOME"
             echo
             echo "## Letzte Diagnosezeilen"
             echo '```text'
