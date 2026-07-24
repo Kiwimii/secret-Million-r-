@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
+          node <<'NODE' 2>&1 | tee smoke.log
           const { createClient } = require('@supabase/supabase-js');
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
           const makeClient = () => createClient(
@@ -131,13 +131,13 @@ jobs:
 
           async function main() {
             let lastError;
-            for (let attempt = 1; attempt <= 24; attempt += 1) {
+            for (let attempt = 1; attempt <= 6; attempt += 1) {
               try {
                 await runAttempt();
                 return;
               } catch (error) {
                 lastError = error;
-                console.log(`Versuch ${attempt}/24 fehlgeschlagen: ${error?.message ?? error}`);
+                console.log(`Versuch ${attempt}/6 fehlgeschlagen: ${error?.message ?? error}`);
                 await sleep(5000);
               }
             }
@@ -171,6 +171,11 @@ jobs:
             echo "- Commit: $GITHUB_SHA"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
             echo "- Partie erstellen, Host-PIN, Spielerbeitritt und Spieler-PIN: $SMOKE_OUTCOME"
+            echo
+            echo "## Letzte Diagnosezeilen"
+            echo '```text'
+            if [[ -f smoke.log ]]; then tail -n 80 smoke.log; else echo "Keine Smoke-Test-Ausgabe vorhanden."; fi
+            echo '```'
           } > docs/LIVE_GAME_SMOKE_STATUS.md
           git add docs/LIVE_GAME_SMOKE_STATUS.md
           git commit -m "[skip ci] Record live game creation smoke test" || exit 0
