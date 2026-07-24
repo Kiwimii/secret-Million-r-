@@ -1,15 +1,11 @@
 import type { AdvantageDefinition } from "./types";
-import {
-  ADVANTAGES as BASE_ADVANTAGES,
-  getAdvantageById,
-} from "./advantages";
 import { MISSIONS, getMissionById } from "./missions";
+import { SIMPLIFIED_ADVANTAGES } from "./simplifiedAdvantages";
 
-// Die bekannten festen Rundenkarten behalten ihre Herkunftsrunde, sind in der
-// digitalen Spielleitung aber bewusst als Alternativauswahl in jeder Runde
-// verfügbar. Dadurch stehen exakt acht bekannte und acht neue Karten zur Wahl.
-export const ADVANTAGES: readonly AdvantageDefinition[] = BASE_ADVANTAGES.map(
-  (advantage) => ({ ...advantage, reserve: true }),
-);
+export const ADVANTAGES: readonly AdvantageDefinition[] = SIMPLIFIED_ADVANTAGES;
 
-export { MISSIONS, getAdvantageById, getMissionById };
+export function getAdvantageById(id: string) {
+  return ADVANTAGES.find((advantage) => advantage.id === id);
+}
+
+export { MISSIONS, getMissionById };

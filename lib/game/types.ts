@@ -48,6 +48,8 @@ export type MissionStatus = "unassigned" | "assigned" | "completed" | "failed";
 
 export type AdvantageEffect =
   | "double_vote"
+  | "triple_vote"
+  | "redirect_vote"
   | "block_vote"
   | "add_two_votes"
   | "redirect_one_vote"
