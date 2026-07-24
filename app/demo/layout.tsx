@@ -10,9 +10,16 @@ import "./midnight-fortune-v2.css";
 import "./midnight-fortune-v2-compat.css";
 import "./live-flow-control.css";
 import "./live-flow-control-compat.css";
+import "./player-resume-gateway.css";
+import PlayerResumeGateway from "./PlayerResumeGateway";
 
 export default function DemoLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return children;
+  return (
+    <div data-player-resume-version="profile-dropdown-v1">
+      <PlayerResumeGateway />
+      {children}
+    </div>
+  );
 }
