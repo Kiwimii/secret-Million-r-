@@ -8,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function DemoPage() {
-  return <DemoAppFinal />;
+  return (
+    <div data-visual-version="midnight-fortune-v2">
+      <DemoAppFinal />
+    </div>
+  );
 }
