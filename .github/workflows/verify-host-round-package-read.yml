@@ -4,6 +4,10 @@ on:
   workflow_run:
     workflows: ["Deploy Supabase Database"]
     types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-host-round-package-read.yml"
   workflow_dispatch:
 
 permissions:
