@@ -1,0 +1,181 @@
+name: Verify live game creation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-live-game-creation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve Supabase browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Create and reopen a complete live game
+        id: smoke
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { createClient } = require('@supabase/supabase-js');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const makeClient = () => createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false } },
+          );
+
+          async function authenticate(client) {
+            const result = await client.auth.signInAnonymously();
+            if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+
+          async function runAttempt() {
+            const host = makeClient();
+            const player = makeClient();
+            let gameId;
+            try {
+              await authenticate(host);
+              const created = await host.rpc('create_live_game', {
+                game_title: `Automatischer Live-Test ${Date.now()}`,
+                host_pin: '2486',
+              });
+              if (created.error) throw created.error;
+              const game = Array.isArray(created.data) ? created.data[0] : undefined;
+              if (!game?.game_id || !/^\d{6}$/.test(String(game.join_code ?? ''))) {
+                throw new Error('Partie oder Einladungscode fehlt.');
+              }
+              gameId = game.game_id;
+              const joinCode = String(game.join_code);
+
+              const hostResume = await host.rpc('resume_live_host', {
+                raw_join_code: joinCode,
+                host_pin: '2486',
+              });
+              if (hostResume.error || hostResume.data !== gameId) throw hostResume.error ?? new Error('Host-PIN-Prüfung fehlgeschlagen.');
+
+              await authenticate(player);
+              const playerName = `Testspieler-${String(Date.now()).slice(-6)}`;
+              const joined = await player.rpc('join_or_resume_live_game', {
+                raw_join_code: joinCode,
+                requested_display_name: playerName,
+                player_pin: '1357',
+                requested_avatar_path: null,
+              });
+              if (joined.error || !Array.isArray(joined.data) || !joined.data[0]?.member_id) throw joined.error ?? new Error('Spielerbeitritt fehlgeschlagen.');
+
+              const resumed = await player.rpc('join_or_resume_live_game', {
+                raw_join_code: joinCode,
+                requested_display_name: playerName,
+                player_pin: '1357',
+                requested_avatar_path: null,
+              });
+              if (resumed.error || resumed.data?.[0]?.resumed !== true) throw resumed.error ?? new Error('Spieler-PIN-Prüfung fehlgeschlagen.');
+
+              const cleanup = await host.from('games').delete().eq('id', gameId);
+              if (cleanup.error) throw cleanup.error;
+              console.log('Echte Live-Partie inklusive Host- und Spieler-PIN erfolgreich geprüft.');
+            } catch (error) {
+              if (gameId) {
+                try { await host.from('games').delete().eq('id', gameId); } catch {}
+              }
+              throw error;
+            }
+          }
+
+          async function main() {
+            let lastError;
+            for (let attempt = 1; attempt <= 24; attempt += 1) {
+              try {
+                await runAttempt();
+                return;
+              } catch (error) {
+                lastError = error;
+                console.log(`Versuch ${attempt}/24 fehlgeschlagen: ${error?.message ?? error}`);
+                await sleep(5000);
+              }
+            }
+            throw lastError ?? new Error('Live-Spieltest fehlgeschlagen.');
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Record smoke-test status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$SMOKE_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Live-Partie-Smoke-Test"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Partie erstellen, Host-PIN, Spielerbeitritt und Spieler-PIN: $SMOKE_OUTCOME"
+          } > docs/LIVE_GAME_SMOKE_STATUS.md
+          git add docs/LIVE_GAME_SMOKE_STATUS.md
+          git commit -m "[skip ci] Record live game creation smoke test" || exit 0
+          git push origin main
+
+      - name: Fail unsuccessful smoke test
+        if: always() && (steps.config.outcome != 'success' || steps.smoke.outcome != 'success')
+        run: exit 1
