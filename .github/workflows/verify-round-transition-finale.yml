@@ -1,0 +1,272 @@
+name: Verify round transitions and finale
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-round-transition-finale.yml"
+  workflow_run:
+    workflows: ["Deploy Supabase Database"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-round-transition-finale
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Resolve browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          key=$(node <<'NODE'
+          const keys = require('./api-keys.json');
+          const item = keys.find((entry) => entry.type === 'publishable') ?? keys.find((entry) => entry.name === 'anon');
+          if (!item?.api_key) process.exit(1);
+          process.stdout.write(item.api_key);
+          NODE
+          )
+          echo "::add-mask::$key"
+          echo "SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "SUPABASE_KEY=$key" >> "$GITHUB_ENV"
+
+      - name: Verify three transitions and both finale outcomes
+        id: flow
+        continue-on-error: true
+        shell: bash
+        run: |
+          node <<'NODE' 2>&1 | tee round-transition-finale.log
+          const { createClient } = require('@supabase/supabase-js');
+          const makeClient = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          async function auth(client) {
+            const result = await client.auth.signInAnonymously();
+            if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+          async function rpc(client, name, args) {
+            const result = await client.rpc(name, args);
+            if (result.error) throw new Error(`${name}: ${result.error.message}`);
+            return result.data;
+          }
+          async function lookup(client, code) {
+            const data = await rpc(client, 'lookup_live_game', { raw_join_code: code });
+            const row = Array.isArray(data) ? data[0] : undefined;
+            if (!row) throw new Error('Partie nicht gefunden.');
+            return row;
+          }
+          async function packageRound(host, gameId, round) {
+            await rpc(host, 'select_live_round_package', {
+              target_game_id: gameId,
+              target_round: round,
+              mission_catalog_id: `transition-mission-${round}`,
+              mission_title: `Übergang Mission ${round}`,
+              mission_task: 'Technischer Übergangstest.',
+              mission_success_criteria: 'André bewertet die Mission.',
+              mission_time_window: `Runde ${round}`,
+              advantage_catalog_id: `transition-double-${round}`,
+              advantage_effect: 'double_vote',
+              advantage_title: 'Doppelte Stimme',
+              advantage_description: 'Die Millionärsstimme zählt doppelt.',
+              advantage_player_instructions: 'Bei Erfolg während der Abstimmung aktivieren.',
+              advantage_host_instructions: 'Automatisch auswerten.',
+              advantage_limit: `Nur Runde ${round}`,
+              advantage_selection_mode: 'none',
+            });
+          }
+          async function runScenario(finalMillionaireSurvives) {
+            const host = makeClient();
+            const playerClients = Array.from({ length: 6 }, () => makeClient());
+            let gameId;
+            try {
+              await auth(host);
+              for (const client of playerClients) await auth(client);
+              const created = await rpc(host, 'create_live_game', {
+                game_title: `Finaltest ${finalMillionaireSurvives ? 'survives' : 'exposed'} ${Date.now()}`,
+                host_pin: '2486',
+              });
+              const game = created[0];
+              gameId = game.game_id;
+              const code = String(game.join_code);
+
+              const players = [];
+              for (let index = 0; index < playerClients.length; index += 1) {
+                const joined = await rpc(playerClients[index], 'join_or_resume_live_game', {
+                  raw_join_code: code,
+                  requested_display_name: `Final-${finalMillionaireSurvives ? 'S' : 'E'}-${index + 1}-${String(Date.now()).slice(-4)}`,
+                  player_pin: String(3200 + index),
+                  requested_avatar_path: null,
+                });
+                players.push({ client: playerClients[index], memberId: joined[0].member_id });
+              }
+
+              for (let round = 1; round <= 4; round += 1) await packageRound(host, gameId, round);
+              await rpc(host, 'draw_random_millionaire', { target_game_id: gameId, excluded_member_id: null });
+
+              for (let round = 1; round <= 4; round += 1) {
+                const overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                const millionaireId = overview.game.currentMillionaireMemberId;
+                const millionaire = players.find((entry) => entry.memberId === millionaireId);
+                if (!millionaire) throw new Error(`Millionär in Runde ${round} hat kein Testgerät.`);
+
+                await rpc(host, 'mark_live_mission_status', {
+                  target_game_id: gameId,
+                  target_round: round,
+                  requested_status: 'failed',
+                });
+                await rpc(host, 'force_live_game_phase', {
+                  target_game_id: gameId,
+                  target_round: round,
+                  target_phase: 'voting',
+                });
+
+                const liveOverview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                const eligible = liveOverview.players.filter((entry) => entry.winnerPoolStatus === 'eligible');
+                let targetId;
+                if (round === 4 && !finalMillionaireSurvives) {
+                  targetId = millionaireId;
+                } else {
+                  targetId = eligible.find((entry) => entry.memberId !== millionaireId)?.memberId;
+                }
+                if (!targetId) throw new Error(`Kein zulässiges Abstimmungsziel in Runde ${round}.`);
+
+                for (const player of players) {
+                  await rpc(player.client, 'submit_live_vote', {
+                    target_game_id: gameId,
+                    target_accused_member_id: targetId,
+                  });
+                }
+
+                await rpc(host, 'force_live_game_phase', {
+                  target_game_id: gameId,
+                  target_round: round,
+                  target_phase: 'evaluation',
+                });
+                const result = await rpc(host, 'finalize_live_round_vote', {
+                  target_game_id: gameId,
+                  target_round: round,
+                });
+
+                const state = await lookup(host, code);
+                if (round < 4) {
+                  if (state.phase !== 'role_transfer') throw new Error(`Runde ${round} wechselte nicht zur Korkenentscheidung.`);
+                  const privateState = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
+                  if (result.millionaireSurvived !== true || privateState.roleDecisionRequired !== true) {
+                    throw new Error(`Millionär wurde nach Runde ${round} nicht zur Entscheidung aufgefordert.`);
+                  }
+                  const decision = round === 2 ? 'release' : 'keep';
+                  const transition = await rpc(millionaire.client, 'submit_live_cork_decision', {
+                    target_game_id: gameId,
+                    requested_decision: decision,
+                  });
+                  if (transition?.transition?.advanced !== true) throw new Error(`Runde ${round + 1} startete nicht automatisch.`);
+                  const nextState = await lookup(host, code);
+                  if (Number(nextState.current_round) !== round + 1 || nextState.phase !== 'role_reveal') {
+                    throw new Error(`Falscher Zustand nach Runde ${round}: ${nextState.current_round}/${nextState.phase}.`);
+                  }
+                  if (decision === 'release') {
+                    const nextOverview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                    if (nextOverview.game.currentMillionaireMemberId === millionaireId) {
+                      throw new Error('Zufällige Weitergabe behielt unerlaubt denselben Millionär.');
+                    }
+                  }
+                } else {
+                  if (state.phase !== 'finished') throw new Error('Nach Runde 4 wurde das Spiel nicht beendet.');
+                  const finalResult = await rpc(players[0].client, 'get_live_final_result', { target_game_id: gameId });
+                  if (!finalResult.published || finalResult.ranking?.length !== players.length) {
+                    throw new Error('Finale Rangliste ist nicht vollständig öffentlich.');
+                  }
+                  if (finalMillionaireSurvives) {
+                    if (finalResult.winnerReason !== 'millionaire_survived'
+                        || finalResult.winnerMemberId !== millionaireId) {
+                      throw new Error('Der unenttarnte Millionär wurde nicht automatisch Sieger.');
+                    }
+                  } else {
+                    if (finalResult.winnerReason !== 'points_after_millionaire_exposed'
+                        || finalResult.winnerMemberId === millionaireId) {
+                      throw new Error('Punktesieger nach finaler Enttarnung ist falsch.');
+                    }
+                    const eligibleRanking = finalResult.ranking.filter((entry) => entry.winnerPoolStatus === 'eligible');
+                    const maximum = Math.max(...eligibleRanking.map((entry) => Number(entry.totalPoints)));
+                    const winner = finalResult.ranking.find((entry) => entry.isWinner);
+                    if (!winner || Number(winner.totalPoints) !== maximum) {
+                      throw new Error('Der finale Sieger besitzt nicht den höchsten zulässigen Punktestand.');
+                    }
+                  }
+                  console.log(`${finalMillionaireSurvives ? 'Überleben' : 'Enttarnung'}: Finale korrekt, Sieger ${finalResult.winnerDisplayName}.`);
+                }
+              }
+
+              await rpc(host, 'delete_own_live_game', { target_game_id: gameId });
+              gameId = undefined;
+            } finally {
+              if (gameId) {
+                try { await rpc(host, 'delete_own_live_game', { target_game_id: gameId }); } catch {}
+              }
+            }
+          }
+          async function main() {
+            await runScenario(true);
+            await runScenario(false);
+            console.log('Rundenübergänge, Korkenentscheidungen und beide Finalfälle erfolgreich geprüft.');
+          }
+          main().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+
+      - name: Record status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          FLOW_OUTCOME: ${{ steps.flow.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$FLOW_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Rundenübergang-und-Finale-Prüfung"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Runde 1-3, Korkenentscheidung, Runde 4 und Rangliste: $FLOW_OUTCOME"
+            echo
+            echo '```text'
+            tail -n 100 round-transition-finale.log 2>/dev/null || true
+            echo '```'
+          } > docs/ROUND_TRANSITION_FINALE_STATUS.md
+          git add docs/ROUND_TRANSITION_FINALE_STATUS.md
+          git commit -m "[skip ci] Record round transition and finale status" || exit 0
+          git push origin main
+      - name: Fail unsuccessful verification
+        if: always() && (steps.config.outcome != 'success' || steps.flow.outcome != 'success')
+        run: exit 1
