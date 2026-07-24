@@ -1,4 +1,4 @@
-name: Verify restored core game flow
+name: Verify host-selected advantage flow
 
 on:
   workflow_run:
@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: verify-restored-core-game-flow
+  group: verify-host-selected-advantage-flow
   cancel-in-progress: true
 
 jobs:
@@ -65,7 +65,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
 
-      - name: Verify advantages, elimination, public result and cork decision
+      - name: Verify host selection, player activation and vote effects
         id: core
         continue-on-error: true
         shell: bash
@@ -79,6 +79,36 @@ jobs:
             process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
             { auth: { persistSession: false, autoRefreshToken: false } },
           );
+
+          const definitions = {
+            double_vote: {
+              id: 'millionaire-double-vote',
+              title: 'Doppelte Stimme',
+              description: 'Die eigene Stimme des Millionärs zählt in dieser Runde doppelt.',
+              player: 'Stimme normal ab. Dein Ziel erhält insgesamt zwei Stimmen.',
+              host: 'Eine verdeckte Zusatzstimme auf das Ziel des Millionärs.',
+              limit: 'Nur die Hauptabstimmung.',
+              mode: 'none',
+            },
+            triple_vote: {
+              id: 'millionaire-triple-vote',
+              title: 'Dreifache Stimme',
+              description: 'Die eigene Stimme des Millionärs zählt in dieser Runde dreifach.',
+              player: 'Stimme normal ab. Dein Ziel erhält insgesamt drei Stimmen.',
+              host: 'Zwei verdeckte Zusatzstimmen auf das Ziel des Millionärs.',
+              limit: 'Nur die Hauptabstimmung.',
+              mode: 'none',
+            },
+            redirect_vote: {
+              id: 'millionaire-redirect-vote',
+              title: 'Goldene Umleitung',
+              description: 'Eine Stimme wird von einem Ausgangsziel auf ein Endziel umgeleitet.',
+              player: 'Bestimme Ausgangs- und Endziel während der Abstimmung.',
+              host: 'Werte die geheime Umleitung automatisch aus.',
+              limit: 'Zwei verschiedene aktive Ziele.',
+              mode: 'source_and_target',
+            },
+          };
 
           async function auth(client) {
             const response = await client.auth.signInAnonymously();
@@ -108,7 +138,7 @@ jobs:
               for (const client of playerClients) await auth(client);
 
               const created = await rpc(host, 'create_live_game', {
-                game_title: `Kernablauf ${effect} ${Date.now()}`,
+                game_title: `Host-Vorteil ${effect} ${Date.now()}`,
                 host_pin: '2486',
               });
               const game = created?.[0];
@@ -127,7 +157,7 @@ jobs:
                 players.push({ client: playerClients[i], memberId: joined[0].member_id, name: joined[0].display_name });
               }
 
-              // Mission bewusst vor der Auslosung speichern, um den Synchronisationstrigger zu prüfen.
+              const definition = definitions[effect];
               await rpc(host, 'select_live_round_mission', {
                 target_game_id: gameId,
                 target_round: 1,
@@ -136,6 +166,18 @@ jobs:
                 mission_task: 'Erfülle unbemerkt die technische Testmission.',
                 mission_success_criteria: 'André bestätigt den Erfolg.',
                 mission_time_window: 'Runde 1',
+              });
+              await rpc(host, 'select_live_round_advantage', {
+                target_game_id: gameId,
+                target_round: 1,
+                advantage_catalog_id: definition.id,
+                advantage_effect: effect,
+                advantage_title: definition.title,
+                advantage_description: definition.description,
+                advantage_player_instructions: definition.player,
+                advantage_host_instructions: definition.host,
+                advantage_limit: definition.limit,
+                advantage_selection_mode: definition.mode,
               });
               await rpc(host, 'draw_random_millionaire', { target_game_id: gameId, excluded_member_id: null });
 
@@ -153,7 +195,27 @@ jobs:
                 target_round: 1,
                 requested_status: 'completed',
               });
-              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'advantage' });
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'voting' });
+
+              const beforeActivation = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
+              if (beforeActivation?.advantage?.effect !== effect || beforeActivation?.advantage?.used_at) {
+                throw new Error(`Der von André festgelegte Vorteil ${effect} ist vor der Anwendung nicht korrekt sichtbar.`);
+              }
+
+              const wrongEffect = effect === 'double_vote' ? 'triple_vote' : 'double_vote';
+              let typeChangeBlocked = false;
+              try {
+                await rpc(millionaire.client, 'choose_live_millionaire_advantage', {
+                  target_game_id: gameId,
+                  target_round: 1,
+                  requested_effect: wrongEffect,
+                  requested_source_member_id: null,
+                  requested_target_member_id: null,
+                });
+              } catch (error) {
+                typeChangeBlocked = /André|festgelegt|nicht geändert/.test(error.message ?? String(error));
+              }
+              if (!typeChangeBlocked) throw new Error('Der Millionär konnte Andrés Vorteilsart unerlaubt ändern.');
 
               await rpc(millionaire.client, 'choose_live_millionaire_advantage', {
                 target_game_id: gameId,
@@ -163,10 +225,10 @@ jobs:
                 requested_target_member_id: effect === 'redirect_vote' ? destination.memberId : null,
               });
 
-              const privateState = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
-              if (privateState?.advantage?.effect !== effect) throw new Error(`Privater Vorteil ${effect} wurde nicht gespeichert.`);
-
-              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'voting' });
+              const afterActivation = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
+              if (afterActivation?.advantage?.effect !== effect || !afterActivation?.advantage?.used_at) {
+                throw new Error(`Der festgelegte Vorteil ${effect} wurde nicht korrekt angewendet.`);
+              }
 
               if (effect === 'redirect_vote') {
                 await rpc(millionaire.client, 'submit_live_vote', { target_game_id: gameId, target_accused_member_id: actorOriginalTarget.memberId });
@@ -193,7 +255,7 @@ jobs:
               if (effect === 'redirect_vote') {
                 if (totals.get(destination.memberId) !== 5) throw new Error(`Umleitungsziel falsch: erwartet 5, erhalten ${totals.get(destination.memberId)}.`);
                 if (totals.get(source.memberId) !== 0) throw new Error(`Ausgangsziel falsch: erwartet 0, erhalten ${totals.get(source.memberId)}.`);
-                if (totals.get(actorOriginalTarget.memberId) !== 0) throw new Error(`Ursprüngliche Millionärsstimme wurde nicht umgeleitet.`);
+                if (totals.get(actorOriginalTarget.memberId) !== 0) throw new Error('Ursprüngliche Millionärsstimme wurde nicht umgeleitet.');
               }
 
               const publicResult = await rpc(nonMillionaires[0].client, 'get_live_public_round_result', { target_game_id: gameId, target_round: 1 });
@@ -205,7 +267,9 @@ jobs:
 
               overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
               const round = overview.rounds.find((entry) => Number(entry.round) === 1);
-              if (round?.advantage?.effect !== effect) throw new Error('Andrés geheime Übersicht enthält den Vorteil nicht korrekt.');
+              if (round?.advantage?.effect !== effect || !round?.advantage?.selectedAt) {
+                throw new Error('Andrés geheime Übersicht enthält Festlegung und Anwendung nicht korrekt.');
+              }
               const eliminated = overview.players.find((player) => player.memberId === publicResult.eliminatedMemberId);
               if (eliminated?.winnerPoolStatus !== 'eliminated') throw new Error('Die meistbeschuldigte Person wurde nicht aus dem Gewinnerpool entfernt.');
               if (round?.scores?.length !== players.length) throw new Error('Die geheime Punkteübersicht ist unvollständig.');
@@ -217,13 +281,10 @@ jobs:
                 target_game_id: gameId,
                 requested_decision: index === 0 ? 'release' : 'keep',
               });
-              overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
-              const decision = overview.rounds.find((entry) => Number(entry.round) === 1)?.roleDecision;
-              if (!decision || !['release', 'keep'].includes(decision.decision)) throw new Error('Korkenentscheidung fehlt in Andrés Übersicht.');
 
               await cleanup(host, gameId);
               gameId = undefined;
-              console.log(`${effect}: Vorteil, Abstimmung, Eliminierung, öffentliche Ansicht und Korkenentscheidung erfolgreich.`);
+              console.log(`${effect}: André-Festlegung, Missionserfolg, Anwendung und Abstimmung erfolgreich.`);
             } catch (error) {
               if (gameId) {
                 try { await cleanup(host, gameId); } catch {}
@@ -240,7 +301,7 @@ jobs:
                 for (let index = 0; index < effects.length; index += 1) {
                   await runScenario(effects[index], index);
                 }
-                console.log('Gesamter ursprünglicher Kernablauf erfolgreich geprüft.');
+                console.log('Host-selected advantage flow vollständig erfolgreich geprüft.');
                 return;
               } catch (error) {
                 lastError = error;
@@ -248,7 +309,7 @@ jobs:
                 await sleep(5000);
               }
             }
-            throw lastError ?? new Error('Kernablauftest fehlgeschlagen.');
+            throw lastError ?? new Error('Vorteilsablauftest fehlgeschlagen.');
           }
 
           main().catch((error) => {
@@ -257,7 +318,7 @@ jobs:
           });
           NODE
 
-      - name: Record core game flow status
+      - name: Record host-selected advantage status
         if: always()
         env:
           CONFIG_OUTCOME: ${{ steps.config.outcome }}
@@ -271,13 +332,13 @@ jobs:
           status="erfolgreich"
           if [[ "$CONFIG_OUTCOME" != "success" || "$CORE_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
           {
-            echo "# Wiederhergestellter Kernablauf"
+            echo "# Von André festgelegter Vorteilsablauf"
             echo
             echo "- Status: $status"
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $TESTED_SHA"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
-            echo "- Vorteile, Eliminierung, öffentliche Ansicht, Punkte und Korken: $CORE_OUTCOME"
+            echo "- André-Festlegung, Missionserfolg, Millionärsanwendung und Abstimmung: $CORE_OUTCOME"
             echo
             echo "## Letzte Diagnosezeilen"
             echo '```text'
@@ -285,9 +346,9 @@ jobs:
             echo '```'
           } > docs/CORE_GAME_FLOW_STATUS.md
           git add docs/CORE_GAME_FLOW_STATUS.md
-          git commit -m "[skip ci] Record restored core game flow status" || exit 0
+          git commit -m "[skip ci] Record host-selected advantage status" || exit 0
           git push origin main
 
-      - name: Fail unsuccessful core flow verification
+      - name: Fail unsuccessful advantage verification
         if: always() && (steps.config.outcome != 'success' || steps.core.outcome != 'success')
         run: exit 1
