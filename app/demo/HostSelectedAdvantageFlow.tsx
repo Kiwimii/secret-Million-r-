@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ADVANTAGES, MISSIONS } from "@/lib/game/catalog";
 import type { RoundNumber } from "@/lib/game/types";
 import { createClient } from "@/lib/supabase/client";
@@ -98,7 +99,7 @@ export default function HostSelectedAdvantageFlow() {
   const [lobby, setLobby] = useState<LobbyMember[]>([]);
   const [overview, setOverview] = useState<HostOverview>();
   const [setups, setSetups] = useState<RoundSetup[]>([]);
-  const [hostOpen, setHostOpen] = useState(false);
+  const [hostSlot, setHostSlot] = useState<HTMLElement | null>(null);
   const [selectedRound, setSelectedRound] = useState<RoundNumber>(1);
   const [missionId, setMissionId] = useState(MISSIONS[0]?.id ?? "");
   const [advantageId, setAdvantageId] = useState(ADVANTAGES[0]?.id ?? "");
@@ -142,7 +143,6 @@ export default function HostSelectedAdvantageFlow() {
         phase: asString(row.phase),
       };
       setSummary(nextSummary);
-      setSelectedRound((current) => current || nextSummary.current_round as RoundNumber);
 
       const lobbyResponse = await client.rpc("get_public_lobby_members", { target_game_id: activeIdentity.gameId });
       if (lobbyResponse.error) throw new Error(lobbyResponse.error.message);
@@ -199,6 +199,28 @@ export default function HostSelectedAdvantageFlow() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!summary?.current_round) return;
+    setSelectedRound(summary.current_round as RoundNumber);
+  }, [summary?.current_round]);
+
+  useEffect(() => {
+    if (identity?.accessRole !== "host") {
+      setHostSlot(null);
+      return;
+    }
+
+    const syncSlot = () => {
+      const nextSlot = document.querySelector<HTMLElement>(".sgi-host-grid");
+      setHostSlot((current) => current === nextSlot ? current : nextSlot);
+    };
+
+    syncSlot();
+    const observer = new MutationObserver(syncSlot);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [identity?.accessRole]);
+
+  useEffect(() => {
     const setup = setups.find((entry) => entry.round === selectedRound);
     setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
     setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
@@ -238,9 +260,10 @@ export default function HostSelectedAdvantageFlow() {
     const mission = MISSIONS.find((entry) => entry.id === missionId);
     const advantage = ADVANTAGES.find((entry) => entry.id === advantageId);
     if (!mission || !advantage) return;
+
     await runAction(async () => {
       const client = await ensureSession();
-      const missionResponse = await client.rpc("select_live_round_mission", {
+      const response = await client.rpc("select_live_round_package", {
         target_game_id: identity.gameId,
         target_round: selectedRound,
         mission_catalog_id: mission.id,
@@ -248,11 +271,6 @@ export default function HostSelectedAdvantageFlow() {
         mission_task: mission.task,
         mission_success_criteria: mission.successCriteria,
         mission_time_window: mission.timeWindow,
-      });
-      if (missionResponse.error) throw new Error(missionResponse.error.message);
-      const advantageResponse = await client.rpc("select_live_round_advantage", {
-        target_game_id: identity.gameId,
-        target_round: selectedRound,
         advantage_catalog_id: advantage.id,
         advantage_effect: advantage.effect,
         advantage_title: advantage.title,
@@ -262,7 +280,7 @@ export default function HostSelectedAdvantageFlow() {
         advantage_limit: advantage.limit,
         advantage_selection_mode: advantage.selectionMode,
       });
-      if (advantageResponse.error) throw new Error(advantageResponse.error.message);
+      if (response.error) throw new Error(response.error.message);
     }, `Mission und Vorteilsart für Runde ${selectedRound} wurden gemeinsam festgelegt.`);
   }
 
@@ -306,6 +324,8 @@ export default function HostSelectedAdvantageFlow() {
   const activeRound = overview?.rounds.find((round) => round.round === selectedRound);
   const selectedMission = MISSIONS.find((entry) => entry.id === missionId);
   const selectedAdvantage = ADVANTAGES.find((entry) => entry.id === advantageId);
+  const selectedSetup = setups.find((entry) => entry.round === selectedRound);
+  const packageComplete = Boolean(selectedSetup?.missionId && selectedSetup?.advantageId);
   const showPlayerActivation = identity.accessRole === "player"
     && summary.phase === "voting"
     && privateState?.role === "millionaire"
@@ -314,63 +334,92 @@ export default function HostSelectedAdvantageFlow() {
     && !privateState.advantage?.used_at
     && !privateState.advantage?.expired_at;
 
-  return (
-    <div className="hsaf-root" data-advantage-flow="host-selected-v1">
-      {identity.accessRole === "host" && (
-        <>
-          <button className="hsaf-host-trigger" type="button" onClick={() => setHostOpen(true)}>
-            <span>◆</span> André · Mission + Vorteil
-          </button>
-          {hostOpen && (
-            <div className="hsaf-backdrop" role="presentation" onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setHostOpen(false);
-            }}>
-              <section className="hsaf-host-panel" role="dialog" aria-modal="true" aria-labelledby="hsaf-host-title">
-                <header>
-                  <div><p>Rundenpaket</p><h2 id="hsaf-host-title">Mission und Vorteilsart gemeinsam festlegen</h2><span>André bestimmt die Art. Der Millionär darf sie später nicht ändern.</span></div>
-                  <button type="button" onClick={() => setHostOpen(false)} aria-label="Schließen">×</button>
-                </header>
+  const hostPackage = identity.accessRole === "host" && hostSlot ? createPortal(
+    <section className={`hsaf-inline-panel ${packageComplete ? "complete" : "required"}`} data-host-round-package="integrated-v2">
+      <header className="hsaf-inline-head">
+        <div>
+          <p>Pflichtschritt · Runde {selectedRound}</p>
+          <h3>Geheime Mission und Vorteil festlegen</h3>
+          <span>André wählt beides gemeinsam. Ohne dieses Rundenpaket kann der Spielablauf nicht fortgesetzt werden.</span>
+        </div>
+        <strong>{packageComplete ? "✓ Gespeichert" : "Auswahl erforderlich"}</strong>
+      </header>
 
-                <nav className="hsaf-rounds">
-                  {([1, 2, 3, 4] as const).map((round) => (
-                    <button className={selectedRound === round ? "active" : ""} type="button" onClick={() => setSelectedRound(round)} key={round}>
-                      Runde {round}
-                      <small>{setups.find((entry) => entry.round === round)?.missionId && setups.find((entry) => entry.round === round)?.advantageId ? "Komplett" : "Offen"}</small>
-                    </button>
-                  ))}
-                </nav>
+      <nav className="hsaf-rounds" aria-label="Rundenpaket auswählen">
+        {([1, 2, 3, 4] as const).map((round) => {
+          const setup = setups.find((entry) => entry.round === round);
+          return (
+            <button className={selectedRound === round ? "active" : ""} type="button" onClick={() => setSelectedRound(round)} key={round}>
+              Runde {round}
+              <small>{setup?.missionId && setup?.advantageId ? "✓ Komplett" : "Noch offen"}</small>
+            </button>
+          );
+        })}
+      </nav>
 
-                <div className="hsaf-package-grid">
-                  <label><span>Geheime Mission</span><select value={missionId} onChange={(event) => setMissionId(event.target.value)}>{MISSIONS.map((mission) => <option value={mission.id} key={mission.id}>{mission.title}</option>)}</select><small>{selectedMission?.task}</small></label>
-                  <label><span>Vorteilsart dieser Runde</span><select value={advantageId} onChange={(event) => setAdvantageId(event.target.value)}>{ADVANTAGES.map((advantage) => <option value={advantage.id} key={advantage.id}>{advantage.title}</option>)}</select><small>{selectedAdvantage?.description}</small></label>
-                </div>
+      <div className="hsaf-package-grid">
+        <label>
+          <span>Geheime Mission</span>
+          <select value={missionId} onChange={(event) => setMissionId(event.target.value)}>
+            {MISSIONS.map((mission) => <option value={mission.id} key={mission.id}>{mission.title}</option>)}
+          </select>
+          <small>{selectedMission?.task}</small>
+        </label>
+        <label>
+          <span>Vorteilsart dieser Runde</span>
+          <select value={advantageId} onChange={(event) => setAdvantageId(event.target.value)}>
+            {ADVANTAGES.map((advantage) => <option value={advantage.id} key={advantage.id}>{advantage.title}</option>)}
+          </select>
+          <small>{selectedAdvantage?.description}</small>
+        </label>
+      </div>
 
-                <div className="hsaf-rule"><b>Verbindliche Logik</b><span>Erst wenn André die Mission als erfolgreich bestätigt, wird genau dieser Vorteil während der Abstimmung für den Millionär freigeschaltet.</span></div>
-                <button className="hsaf-primary" disabled={busy} type="button" onClick={() => void saveRoundPackage()}>{busy ? "Wird gespeichert …" : `Mission + Vorteil für Runde ${selectedRound} speichern`}</button>
+      <div className="hsaf-rule">
+        <b>Verbindliche Logik</b>
+        <span>Erst wenn André die Mission später als erfolgreich bestätigt, wird genau dieser Vorteil während der Abstimmung für den Millionär freigeschaltet.</span>
+      </div>
+      <button className="hsaf-primary" disabled={busy || !missionId || !advantageId} type="button" onClick={() => void saveRoundPackage()}>
+        {busy ? "Wird gespeichert …" : `Mission + Vorteil für Runde ${selectedRound} verbindlich speichern`}
+      </button>
 
-                {activeRound?.mission && selectedRound === Number(summary.current_round) && (
-                  <section className="hsaf-review">
-                    <div><p>Aktuelle Mission</p><strong>{activeRound.mission.title}</strong><span>Geheim bei {activeRound.mission.assignedDisplayName} · Status: {activeRound.mission.status}</span></div>
-                    <div><button className="success" disabled={busy} type="button" onClick={() => void markMission("completed")}>✓ Mission erfolgreich</button><button className="danger" disabled={busy} type="button" onClick={() => void markMission("failed")}>✕ Mission gescheitert</button></div>
-                  </section>
-                )}
-
-                {activeRound?.advantage && (
-                  <section className="hsaf-status">
-                    <span>Von André festgelegter Vorteil</span>
-                    <strong>{activeRound.advantage.title}</strong>
-                    <small>{activeRound.advantage.selectedAt ? "Vom Millionär in der Abstimmung angewendet" : activeRound.mission?.status === "completed" ? "Freigeschaltet – wartet auf Anwendung in der Abstimmung" : activeRound.mission?.status === "failed" ? "Verfallen" : "Noch gesperrt"}</small>
-                    {activeRound.advantage.sourceDisplayName && <em>Ausgangsziel: {activeRound.advantage.sourceDisplayName}</em>}
-                    {activeRound.advantage.targetDisplayName && <em>Endziel: {activeRound.advantage.targetDisplayName}</em>}
-                  </section>
-                )}
-
-                {(error || message) && <div className={`hsaf-message ${error ? "error" : "success"}`}>{error ?? message}</div>}
-              </section>
-            </div>
-          )}
-        </>
+      {activeRound?.mission && selectedRound === Number(summary.current_round) && (
+        <section className="hsaf-review">
+          <div>
+            <p>Aktuelle Mission</p>
+            <strong>{activeRound.mission.title}</strong>
+            <span>Geheim bei {activeRound.mission.assignedDisplayName} · Status: {activeRound.mission.status}</span>
+          </div>
+          <div>
+            <button className="success" disabled={busy} type="button" onClick={() => void markMission("completed")}>✓ Mission erfolgreich</button>
+            <button className="danger" disabled={busy} type="button" onClick={() => void markMission("failed")}>✕ Mission gescheitert</button>
+          </div>
+        </section>
       )}
+
+      {activeRound?.advantage && (
+        <section className="hsaf-status">
+          <span>Von André festgelegter Vorteil</span>
+          <strong>{activeRound.advantage.title}</strong>
+          <small>{activeRound.advantage.selectedAt
+            ? "Vom Millionär in der Abstimmung angewendet"
+            : activeRound.mission?.status === "completed"
+              ? "Freigeschaltet – wartet auf Anwendung in der Abstimmung"
+              : activeRound.mission?.status === "failed"
+                ? "Verfallen"
+                : "Noch gesperrt"}</small>
+          {activeRound.advantage.sourceDisplayName && <em>Ausgangsziel: {activeRound.advantage.sourceDisplayName}</em>}
+          {activeRound.advantage.targetDisplayName && <em>Endziel: {activeRound.advantage.targetDisplayName}</em>}
+        </section>
+      )}
+
+      {(error || message) && <div className={`hsaf-message ${error ? "error" : "success"}`}>{error ?? message}</div>}
+    </section>,
+    hostSlot,
+  ) : null;
+
+  return (
+    <div className="hsaf-root" data-advantage-flow="host-selected-integrated-v2">
+      {hostPackage}
 
       {showPlayerActivation && privateState?.advantage && (
         <div className="hsaf-player-backdrop">
@@ -378,14 +427,30 @@ export default function HostSelectedAdvantageFlow() {
             <p>Mission erfolgreich · von André freigeschaltet</p>
             <h2>{privateState.advantage.title_snapshot}</h2>
             <strong>{privateState.advantage.description_snapshot}</strong>
-            <div className="hsaf-locked-type"><span>Vorteilsart</span><b>Von André vor der Runde festgelegt</b><small>Du kannst die Art nicht ändern. Du entscheidest nur über die Anwendung in dieser Abstimmung.</small></div>
+            <div className="hsaf-locked-type">
+              <span>Vorteilsart</span>
+              <b>Von André vor der Runde festgelegt</b>
+              <small>Du kannst die Art nicht ändern. Du entscheidest nur über die Anwendung in dieser Abstimmung.</small>
+            </div>
             {privateState.advantage.effect === "redirect_vote" && (
               <div className="hsaf-targets">
-                <label><span>Eine Stimme wegnehmen von</span><select value={sourceMemberId} onChange={(event) => setSourceMemberId(event.target.value)}>{candidates.map((member) => <option value={member.memberId} key={member.memberId}>{member.displayName}</option>)}</select></label>
-                <label><span>Stimmen geben an</span><select value={targetMemberId} onChange={(event) => setTargetMemberId(event.target.value)}>{candidates.filter((member) => member.memberId !== sourceMemberId).map((member) => <option value={member.memberId} key={member.memberId}>{member.displayName}</option>)}</select></label>
+                <label>
+                  <span>Eine Stimme wegnehmen von</span>
+                  <select value={sourceMemberId} onChange={(event) => setSourceMemberId(event.target.value)}>
+                    {candidates.map((member) => <option value={member.memberId} key={member.memberId}>{member.displayName}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Stimmen geben an</span>
+                  <select value={targetMemberId} onChange={(event) => setTargetMemberId(event.target.value)}>
+                    {candidates.filter((member) => member.memberId !== sourceMemberId).map((member) => <option value={member.memberId} key={member.memberId}>{member.displayName}</option>)}
+                  </select>
+                </label>
               </div>
             )}
-            <button className="hsaf-apply" disabled={busy || (privateState.advantage.effect === "redirect_vote" && (!sourceMemberId || !targetMemberId || sourceMemberId === targetMemberId))} type="button" onClick={() => void applyAdvantage()}>{busy ? "Wird aktiviert …" : `${privateState.advantage.title_snapshot} jetzt anwenden`}</button>
+            <button className="hsaf-apply" disabled={busy || (privateState.advantage.effect === "redirect_vote" && (!sourceMemberId || !targetMemberId || sourceMemberId === targetMemberId))} type="button" onClick={() => void applyAdvantage()}>
+              {busy ? "Wird aktiviert …" : `${privateState.advantage.title_snapshot} jetzt anwenden`}
+            </button>
             <small className="hsaf-vote-note">Danach gibst du deine geheime Stimme normal ab. Die Wirkung wird automatisch und verdeckt ausgewertet.</small>
             {(error || message) && <div className={`hsaf-message ${error ? "error" : "success"}`}>{error ?? message}</div>}
           </section>
