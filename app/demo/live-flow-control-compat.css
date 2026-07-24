@@ -1,0 +1,19 @@
+/* Safari/iPhone compatibility fallbacks for custom-property particle layouts. */
+.mf3-particles i:nth-child(10n + 1),.mf3-confetti i:nth-child(10n + 1){left:4%}
+.mf3-particles i:nth-child(10n + 2),.mf3-confetti i:nth-child(10n + 2){left:14%}
+.mf3-particles i:nth-child(10n + 3),.mf3-confetti i:nth-child(10n + 3){left:24%}
+.mf3-particles i:nth-child(10n + 4),.mf3-confetti i:nth-child(10n + 4){left:34%}
+.mf3-particles i:nth-child(10n + 5),.mf3-confetti i:nth-child(10n + 5){left:44%}
+.mf3-particles i:nth-child(10n + 6),.mf3-confetti i:nth-child(10n + 6){left:54%}
+.mf3-particles i:nth-child(10n + 7),.mf3-confetti i:nth-child(10n + 7){left:64%}
+.mf3-particles i:nth-child(10n + 8),.mf3-confetti i:nth-child(10n + 8){left:74%}
+.mf3-particles i:nth-child(10n + 9),.mf3-confetti i:nth-child(10n + 9){left:84%}
+.mf3-particles i:nth-child(10n),.mf3-confetti i:nth-child(10n){left:94%}
+
+@supports(-webkit-touch-callout:none){
+  .mf3-role-reveal{height:auto;overflow:visible;min-height:max(500px,calc(100svh - 235px))}
+  .mf3-role-sealed,.mf3-role-result{position:relative;inset:auto;min-height:440px;align-content:center}
+  .mf3-role-result>*{max-width:100%}
+  .mf3-role-result h2{overflow-wrap:anywhere}
+  .mf3-player-action{overflow:visible}
+}

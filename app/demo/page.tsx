@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import DemoAppFinal from "./DemoAppFinal";
 
 export const metadata: Metadata = {
-  title: "Einsatztest | Secret Millionär",
+  title: "Secret Millionär – Live-Ablauf V3",
   description:
-    "Geführte, mobile Browser-Testversion des vollständigen Secret-Millionär-Spiels.",
+    "Mobile Live-Partie mit verbindlichem Challenge-, Fragen-, Missions- und Vorteilssystem.",
 };
 
 export default function DemoPage() {
   return (
-    <div data-visual-version="midnight-fortune-v2">
+    <div data-visual-version="midnight-fortune-v3" data-live-flow="authoritative">
       <DemoAppFinal />
     </div>
   );

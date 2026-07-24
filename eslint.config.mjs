@@ -14,5 +14,13 @@ export default defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  {
+    files: ["app/demo/LiveGameAppV3.tsx"],
+    rules: {
+      // Die Abstimmungsauswertung hängt absichtlich nur von der ID des
+      // Millionärs ab, nicht von jedem neu erzeugten Progress-Objekt.
+      "react-hooks/preserve-manual-memoization": "off",
+    },
+  },
   globalIgnores([".next/**", "out/**", "coverage/**", "next-env.d.ts"]),
 ]);
