@@ -6,6 +6,10 @@ on:
       - agent/fix-round-package-selection
     paths:
       - .github/workflows/one-time-fix-round-package-selection.yml
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -29,19 +33,19 @@ jobs:
           text = path.read_text(encoding="utf-8")
 
           old_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-            const refreshingRef = useRef(false);
-          """.replace("            ", "  ")
+          const refreshingRef = useRef(false);
+          """
           new_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-            const refreshingRef = useRef(false);
-            const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string }>();
-          """.replace("            ", "  ")
+          const refreshingRef = useRef(false);
+          const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string }>();
+          """
 
           old_effect = """  useEffect(() => {
             const setup = setups.find((entry) => entry.round === selectedRound);
             setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
             setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
           }, [selectedRound, setups]);
-          """.replace("            ", "  ")
+          """
           new_effect = """  useEffect(() => {
             const setup = setups.find((entry) => entry.round === selectedRound);
             const setupKey = `${selectedRound}:${setup?.missionId ?? ""}:${setup?.advantageId ?? ""}`;
@@ -56,7 +60,7 @@ jobs:
             setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
             setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
           }, [selectedRound, setups]);
-          """.replace("            ", "  ")
+          """
 
           if text.count(old_refs) != 1:
             raise SystemExit("Reference insertion point was not found exactly once.")
