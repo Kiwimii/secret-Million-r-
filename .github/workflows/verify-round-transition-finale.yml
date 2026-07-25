@@ -34,6 +34,7 @@ jobs:
         with:
           node-version: 24
       - run: npm install
+
       - name: Resolve browser key
         id: config
         continue-on-error: true
@@ -62,24 +63,29 @@ jobs:
         run: |
           node <<'NODE' 2>&1 | tee round-transition-finale.log
           const { createClient } = require('@supabase/supabase-js');
+
           const makeClient = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
             auth: { persistSession: false, autoRefreshToken: false },
           });
+
           async function auth(client) {
             const result = await client.auth.signInAnonymously();
             if (result.error || !result.data.user) throw result.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
           }
+
           async function rpc(client, name, args) {
             const result = await client.rpc(name, args);
             if (result.error) throw new Error(`${name}: ${result.error.message}`);
             return result.data;
           }
+
           async function lookup(client, code) {
             const data = await rpc(client, 'lookup_live_game', { raw_join_code: code });
             const row = Array.isArray(data) ? data[0] : undefined;
             if (!row) throw new Error('Partie nicht gefunden.');
             return row;
           }
+
           async function packageRound(host, gameId, round) {
             await rpc(host, 'select_live_round_package', {
               target_game_id: gameId,
@@ -99,13 +105,16 @@ jobs:
               advantage_selection_mode: 'none',
             });
           }
+
           async function runScenario(finalMillionaireSurvives) {
             const host = makeClient();
             const playerClients = Array.from({ length: 6 }, () => makeClient());
             let gameId;
+
             try {
               await auth(host);
               for (const client of playerClients) await auth(client);
+
               const created = await rpc(host, 'create_live_game', {
                 game_title: `Finaltest ${finalMillionaireSurvives ? 'survives' : 'exposed'} ${Date.now()}`,
                 host_pin: '2486',
@@ -126,10 +135,15 @@ jobs:
               }
 
               for (let round = 1; round <= 4; round += 1) await packageRound(host, gameId, round);
-              await rpc(host, 'draw_random_millionaire', { target_game_id: gameId, excluded_member_id: null });
+              await rpc(host, 'draw_random_millionaire', {
+                target_game_id: gameId,
+                excluded_member_id: null,
+              });
 
               for (let round = 1; round <= 4; round += 1) {
-                const overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                const overview = await rpc(host, 'get_live_host_game_overview', {
+                  target_game_id: gameId,
+                });
                 const millionaireId = overview.game.currentMillionaireMemberId;
                 const millionaire = players.find((entry) => entry.memberId === millionaireId);
                 if (!millionaire) throw new Error(`Millionär in Runde ${round} hat kein Testgerät.`);
@@ -145,14 +159,13 @@ jobs:
                   target_phase: 'voting',
                 });
 
-                const liveOverview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                const liveOverview = await rpc(host, 'get_live_host_game_overview', {
+                  target_game_id: gameId,
+                });
                 const eligible = liveOverview.players.filter((entry) => entry.winnerPoolStatus === 'eligible');
-                let targetId;
-                if (round === 4 && !finalMillionaireSurvives) {
-                  targetId = millionaireId;
-                } else {
-                  targetId = eligible.find((entry) => entry.memberId !== millionaireId)?.memberId;
-                }
+                const targetId = round === 4 && !finalMillionaireSurvives
+                  ? millionaireId
+                  : eligible.find((entry) => entry.memberId !== millionaireId)?.memberId;
                 if (!targetId) throw new Error(`Kein zulässiges Abstimmungsziel in Runde ${round}.`);
 
                 for (const player of players) {
@@ -174,30 +187,68 @@ jobs:
 
                 const state = await lookup(host, code);
                 if (round < 4) {
-                  if (state.phase !== 'role_transfer') throw new Error(`Runde ${round} wechselte nicht zur Korkenentscheidung.`);
-                  const privateState = await rpc(millionaire.client, 'get_live_private_state', { target_game_id: gameId });
-                  if (result.millionaireSurvived !== true || privateState.roleDecisionRequired !== true) {
+                  if (state.phase !== 'role_transfer') {
+                    throw new Error(`Runde ${round} wechselte nicht zur Korkenentscheidung.`);
+                  }
+                  const privateState = await rpc(millionaire.client, 'get_live_private_state', {
+                    target_game_id: gameId,
+                  });
+                  if (!result.millionaireSurvived || privateState.roleDecisionRequired !== true) {
                     throw new Error(`Millionär wurde nach Runde ${round} nicht zur Entscheidung aufgefordert.`);
                   }
+
                   const decision = round === 2 ? 'release' : 'keep';
-                  const transition = await rpc(millionaire.client, 'submit_live_cork_decision', {
+                  const decisionResponse = await rpc(millionaire.client, 'submit_live_cork_decision', {
                     target_game_id: gameId,
                     requested_decision: decision,
                   });
-                  if (transition?.transition?.advanced !== true) throw new Error(`Runde ${round + 1} startete nicht automatisch.`);
+
+                  let transition = decisionResponse?.transition;
+                  if (decision === 'release') {
+                    if (transition?.advanced || transition?.reason !== 'candidate_confirmation_required') {
+                      throw new Error('Die zufällige Weitergabe startete ohne Andrés geheime Bestätigung.');
+                    }
+                    const firstCandidate = await rpc(host, 'get_live_next_millionaire_candidate', {
+                      target_game_id: gameId,
+                    });
+                    if (!firstCandidate.requiresHostConfirmation || firstCandidate.decision !== 'release') {
+                      throw new Error('Der neue Millionär wartet nicht auf Andrés Bestätigung.');
+                    }
+                    await rpc(host, 'reroll_live_next_millionaire', {
+                      target_game_id: gameId,
+                    });
+                    const secondCandidate = await rpc(host, 'get_live_next_millionaire_candidate', {
+                      target_game_id: gameId,
+                    });
+                    if (secondCandidate.candidateMemberId === firstCandidate.candidateMemberId) {
+                      throw new Error('Die Neu-Auslosung behielt denselben Millionär.');
+                    }
+                    const confirmed = await rpc(host, 'confirm_live_next_millionaire', {
+                      target_game_id: gameId,
+                    });
+                    transition = confirmed?.transition;
+                  }
+
+                  if (transition?.advanced !== true) {
+                    throw new Error(`Runde ${round + 1} startete nicht nach der erforderlichen Freigabe.`);
+                  }
                   const nextState = await lookup(host, code);
                   if (Number(nextState.current_round) !== round + 1 || nextState.phase !== 'role_reveal') {
                     throw new Error(`Falscher Zustand nach Runde ${round}: ${nextState.current_round}/${nextState.phase}.`);
                   }
                   if (decision === 'release') {
-                    const nextOverview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+                    const nextOverview = await rpc(host, 'get_live_host_game_overview', {
+                      target_game_id: gameId,
+                    });
                     if (nextOverview.game.currentMillionaireMemberId === millionaireId) {
                       throw new Error('Zufällige Weitergabe behielt unerlaubt denselben Millionär.');
                     }
                   }
                 } else {
                   if (state.phase !== 'finished') throw new Error('Nach Runde 4 wurde das Spiel nicht beendet.');
-                  const finalResult = await rpc(players[0].client, 'get_live_final_result', { target_game_id: gameId });
+                  const finalResult = await rpc(players[0].client, 'get_live_final_result', {
+                    target_game_id: gameId,
+                  });
                   if (!finalResult.published || finalResult.ranking?.length !== players.length) {
                     throw new Error('Finale Rangliste ist nicht vollständig öffentlich.');
                   }
@@ -230,12 +281,17 @@ jobs:
               }
             }
           }
+
           async function main() {
             await runScenario(true);
             await runScenario(false);
-            console.log('Rundenübergänge, Korkenentscheidungen und beide Finalfälle erfolgreich geprüft.');
+            console.log('Rundenübergänge, Host-Freigabe und beide Finalfälle erfolgreich geprüft.');
           }
-          main().catch((error) => { console.error(error); process.exit(1); });
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
           NODE
 
       - name: Record status
@@ -258,7 +314,7 @@ jobs:
             echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "- Commit: $TESTED_SHA"
             echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
-            echo "- Runde 1-3, Korkenentscheidung, Runde 4 und Rangliste: $FLOW_OUTCOME"
+            echo "- Runde 1-3, Host-Freigabe, Runde 4 und Rangliste: $FLOW_OUTCOME"
             echo
             echo '```text'
             tail -n 100 round-transition-finale.log 2>/dev/null || true
@@ -267,6 +323,7 @@ jobs:
           git add docs/ROUND_TRANSITION_FINALE_STATUS.md
           git commit -m "[skip ci] Record round transition and finale status" || exit 0
           git push origin main
+
       - name: Fail unsuccessful verification
         if: always() && (steps.config.outcome != 'success' || steps.flow.outcome != 'success')
         run: exit 1
