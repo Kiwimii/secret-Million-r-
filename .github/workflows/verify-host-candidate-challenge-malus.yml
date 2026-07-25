@@ -1,0 +1,373 @@
+name: Verify host candidate approval and challenge malus
+
+on:
+  workflow_run:
+    workflows: ["Deploy Supabase Database"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-host-candidate-challenge-malus.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-host-candidate-challenge-malus
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+
+      - name: Resolve browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          key=$(node <<'NODE'
+          const keys = require('./api-keys.json');
+          const item = keys.find((entry) => entry.type === 'publishable') ?? keys.find((entry) => entry.name === 'anon');
+          if (!item?.api_key) process.exit(1);
+          process.stdout.write(item.api_key);
+          NODE
+          )
+          echo "::add-mask::$key"
+          echo "SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "SUPABASE_KEY=$key" >> "$GITHUB_ENV"
+
+      - name: Verify release, replacement, reroll and three-vote malus
+        id: flow
+        continue-on-error: true
+        shell: bash
+        run: |
+          node <<'NODE' 2>&1 | tee host-candidate-challenge-malus.log
+          const { createClient } = require('@supabase/supabase-js');
+
+          const makeClient = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+
+          async function signIn(client) {
+            const response = await client.auth.signInAnonymously();
+            if (response.error || !response.data.user) throw response.error ?? new Error('Anonyme Anmeldung fehlgeschlagen.');
+          }
+
+          async function rpc(client, name, args) {
+            const response = await client.rpc(name, args);
+            if (response.error) throw new Error(`${name}: ${response.error.message}`);
+            return response.data;
+          }
+
+          async function createFixture(label) {
+            const host = makeClient();
+            const playerClients = Array.from({ length: 6 }, () => makeClient());
+            await signIn(host);
+            for (const client of playerClients) await signIn(client);
+
+            const created = await rpc(host, 'create_live_game', {
+              game_title: `${label} ${Date.now()}`,
+              host_pin: '2486',
+            });
+            const game = created[0];
+            const players = [];
+            for (let index = 0; index < playerClients.length; index += 1) {
+              const joined = await rpc(playerClients[index], 'join_or_resume_live_game', {
+                raw_join_code: String(game.join_code),
+                requested_display_name: `${label}-${index + 1}-${String(Date.now()).slice(-4)}`,
+                player_pin: String(5600 + index),
+                requested_avatar_path: null,
+              });
+              players.push({ client: playerClients[index], memberId: joined[0].member_id });
+            }
+            return { host, gameId: game.game_id, joinCode: String(game.join_code), players };
+          }
+
+          async function packageRound(host, gameId, round) {
+            await rpc(host, 'select_live_round_package', {
+              target_game_id: gameId,
+              target_round: round,
+              mission_catalog_id: `candidate-mission-${round}`,
+              mission_title: `Kandidatentest ${round}`,
+              mission_task: 'Technische Mission.',
+              mission_success_criteria: 'André bestätigt den Status.',
+              mission_time_window: `Runde ${round}`,
+              advantage_catalog_id: `candidate-double-${round}`,
+              advantage_effect: 'double_vote',
+              advantage_title: 'Doppelte Stimme',
+              advantage_description: 'Testvorteil.',
+              advantage_player_instructions: 'Bei Erfolg aktivieren.',
+              advantage_host_instructions: 'Automatisch auswerten.',
+              advantage_limit: `Nur Runde ${round}`,
+              advantage_selection_mode: 'none',
+            });
+          }
+
+          async function prepareVoting(host, gameId, round) {
+            await rpc(host, 'mark_live_mission_status', {
+              target_game_id: gameId,
+              target_round: round,
+              requested_status: 'failed',
+            });
+            await rpc(host, 'force_live_game_phase', {
+              target_game_id: gameId,
+              target_round: round,
+              target_phase: 'voting',
+            });
+          }
+
+          async function finalize(host, gameId, round) {
+            await rpc(host, 'force_live_game_phase', {
+              target_game_id: gameId,
+              target_round: round,
+              target_phase: 'evaluation',
+            });
+            return rpc(host, 'finalize_live_round_vote', {
+              target_game_id: gameId,
+              target_round: round,
+            });
+          }
+
+          async function testReleaseReroll() {
+            const fixture = await createFixture('Release');
+            let activeGameId = fixture.gameId;
+            try {
+              await packageRound(fixture.host, fixture.gameId, 1);
+              await packageRound(fixture.host, fixture.gameId, 2);
+              await rpc(fixture.host, 'draw_random_millionaire', {
+                target_game_id: fixture.gameId,
+                excluded_member_id: null,
+              });
+
+              const overview = await rpc(fixture.host, 'get_live_host_game_overview', {
+                target_game_id: fixture.gameId,
+              });
+              const millionaireId = overview.game.currentMillionaireMemberId;
+              const millionaire = fixture.players.find((entry) => entry.memberId === millionaireId);
+              const safeTarget = fixture.players.find((entry) => entry.memberId !== millionaireId);
+              if (!millionaire || !safeTarget) throw new Error('Release-Test konnte Rollen nicht auflösen.');
+
+              await prepareVoting(fixture.host, fixture.gameId, 1);
+              for (const player of fixture.players) {
+                await rpc(player.client, 'submit_live_vote', {
+                  target_game_id: fixture.gameId,
+                  target_accused_member_id: safeTarget.memberId,
+                });
+              }
+              const roundResult = await finalize(fixture.host, fixture.gameId, 1);
+              if (!roundResult.millionaireSurvived) throw new Error('Der Millionär sollte den Release-Test überleben.');
+
+              const release = await rpc(millionaire.client, 'submit_live_cork_decision', {
+                target_game_id: fixture.gameId,
+                requested_decision: 'release',
+              });
+              if (release?.transition?.advanced || release?.transition?.reason !== 'candidate_confirmation_required') {
+                throw new Error('Die zufällige Weitergabe startete ohne Andrés Bestätigung.');
+              }
+
+              const firstCandidate = await rpc(fixture.host, 'get_live_next_millionaire_candidate', {
+                target_game_id: fixture.gameId,
+              });
+              if (!firstCandidate.requiresHostConfirmation || firstCandidate.decision !== 'release') {
+                throw new Error('Der geheime Release-Kandidat wartet nicht auf André.');
+              }
+
+              await rpc(fixture.host, 'reroll_live_next_millionaire', {
+                target_game_id: fixture.gameId,
+              });
+              const secondCandidate = await rpc(fixture.host, 'get_live_next_millionaire_candidate', {
+                target_game_id: fixture.gameId,
+              });
+              if (secondCandidate.candidateMemberId === firstCandidate.candidateMemberId) {
+                throw new Error('Die Neu-Auslosung hat denselben Release-Kandidaten behalten.');
+              }
+
+              const confirmed = await rpc(fixture.host, 'confirm_live_next_millionaire', {
+                target_game_id: fixture.gameId,
+              });
+              if (!confirmed?.transition?.advanced || confirmed.transition.nextRound !== 2) {
+                throw new Error('Runde 2 startete nach Bestätigung des Release-Kandidaten nicht.');
+              }
+
+              console.log('Korkenweitergabe: Kandidat abgelehnt, neu ausgelost und bestätigt.');
+              await rpc(fixture.host, 'delete_own_live_game', { target_game_id: fixture.gameId });
+              activeGameId = undefined;
+            } finally {
+              if (activeGameId) {
+                try { await rpc(fixture.host, 'delete_own_live_game', { target_game_id: activeGameId }); } catch {}
+              }
+            }
+          }
+
+          async function testReplacementAndMalus() {
+            const fixture = await createFixture('Malus');
+            let activeGameId = fixture.gameId;
+            try {
+              await packageRound(fixture.host, fixture.gameId, 1);
+              await packageRound(fixture.host, fixture.gameId, 2);
+              await rpc(fixture.host, 'select_live_challenge', {
+                target_game_id: fixture.gameId,
+                target_round: 1,
+                challenge_catalog_id: 'candidate-challenge',
+                challenge_title: 'Technische Team-Challenge',
+                challenge_public_name: 'Technische Team-Challenge',
+                challenge_player_briefing: 'Spielt im ausgelosten Team.',
+                challenge_host_instructions: 'Bestätige das Gewinnerteam.',
+                challenge_duration: '5 Minuten',
+                challenge_material: [],
+                challenge_win_condition: 'Ein Team gewinnt.',
+                challenge_safety_note: 'Sicher spielen.',
+              });
+              await rpc(fixture.host, 'draw_live_challenge_teams', {
+                target_game_id: fixture.gameId,
+                target_round: 1,
+              });
+              await rpc(fixture.host, 'draw_random_millionaire', {
+                target_game_id: fixture.gameId,
+                excluded_member_id: null,
+              });
+
+              const overview = await rpc(fixture.host, 'get_live_host_game_overview', {
+                target_game_id: fixture.gameId,
+              });
+              const millionaireId = overview.game.currentMillionaireMemberId;
+              const millionaire = fixture.players.find((entry) => entry.memberId === millionaireId);
+              if (!millionaire) throw new Error('Malus-Test konnte den Millionär nicht auflösen.');
+
+              const lobby = await rpc(fixture.host, 'get_public_lobby_members', {
+                target_game_id: fixture.gameId,
+              });
+              const millionaireLobby = lobby.find((entry) => entry.member_id === millionaireId);
+              const millionaireTeam = millionaireLobby?.challenge_team;
+              if (!millionaireTeam) throw new Error('Das Challenge-Team des Millionärs fehlt.');
+              const winningTeam = millionaireTeam === 'azur' ? 'gold' : 'azur';
+              await rpc(fixture.host, 'confirm_live_challenge_winner', {
+                target_game_id: fixture.gameId,
+                target_round: 1,
+                winning_team_code: winningTeam,
+              });
+
+              await prepareVoting(fixture.host, fixture.gameId, 1);
+              const targets = fixture.players.filter((entry) => entry.memberId !== millionaireId).slice(0, 4);
+              if (targets.length < 4) throw new Error('Zu wenige Abstimmungsziele für den Malus-Test.');
+              for (let index = 0; index < fixture.players.length; index += 1) {
+                await rpc(fixture.players[index].client, 'submit_live_vote', {
+                  target_game_id: fixture.gameId,
+                  target_accused_member_id: targets[index % targets.length].memberId,
+                });
+              }
+
+              const roundResult = await finalize(fixture.host, fixture.gameId, 1);
+              const millionaireTally = (roundResult.tally ?? []).find((entry) => entry.memberId === millionaireId);
+              if (Number(millionaireTally?.totalVotes) !== 3) {
+                throw new Error(`Challenge-Malus falsch: erwartet 3, erhalten ${millionaireTally?.totalVotes}.`);
+              }
+              if (roundResult.eliminatedMemberId !== millionaireId || roundResult.millionaireSurvived !== false) {
+                throw new Error('Der gescheiterte Millionär wurde trotz drei Strafstimmen nicht enttarnt.');
+              }
+
+              const penalties = await rpc(fixture.host, 'get_live_host_round_penalties', {
+                target_game_id: fixture.gameId,
+              });
+              const recordedPenalty = penalties.find((entry) => Number(entry.round) === 1);
+              if (recordedPenalty?.memberId !== millionaireId || Number(recordedPenalty?.penaltyVotes) !== 3) {
+                throw new Error('Der Challenge-Malus wurde nicht für Andrés Ergebnisübersicht gespeichert.');
+              }
+
+              const firstCandidate = await rpc(fixture.host, 'get_live_next_millionaire_candidate', {
+                target_game_id: fixture.gameId,
+              });
+              if (firstCandidate.decision !== 'replacement' || !firstCandidate.requiresHostConfirmation) {
+                throw new Error('Der Ersatzkandidat nach Enttarnung wartet nicht auf Andrés Bestätigung.');
+              }
+              await rpc(fixture.host, 'reroll_live_next_millionaire', {
+                target_game_id: fixture.gameId,
+              });
+              const secondCandidate = await rpc(fixture.host, 'get_live_next_millionaire_candidate', {
+                target_game_id: fixture.gameId,
+              });
+              if (secondCandidate.candidateMemberId === firstCandidate.candidateMemberId) {
+                throw new Error('Die Neu-Auslosung hat denselben Ersatzkandidaten behalten.');
+              }
+              const confirmed = await rpc(fixture.host, 'confirm_live_next_millionaire', {
+                target_game_id: fixture.gameId,
+              });
+              if (!confirmed?.transition?.advanced || confirmed.transition.nextRound !== 2) {
+                throw new Error('Runde 2 startete nach Bestätigung des Ersatzkandidaten nicht.');
+              }
+
+              console.log('Enttarnung: +3 Challenge-Stimmen, Ersatz abgelehnt, neu ausgelost und bestätigt.');
+              await rpc(fixture.host, 'delete_own_live_game', { target_game_id: fixture.gameId });
+              activeGameId = undefined;
+            } finally {
+              if (activeGameId) {
+                try { await rpc(fixture.host, 'delete_own_live_game', { target_game_id: activeGameId }); } catch {}
+              }
+            }
+          }
+
+          async function main() {
+            await testReleaseReroll();
+            await testReplacementAndMalus();
+            console.log('Host-Freigabe, Neu-Auslosung und Challenge-Malus vollständig erfolgreich geprüft.');
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Record status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          FLOW_OUTCOME: ${{ steps.flow.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$FLOW_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Host-Kandidat-und-Challenge-Malus-Prüfung"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Korkenweitergabe, Ersatz-Auslosung, Host-Bestätigung und +3 Malus: $FLOW_OUTCOME"
+            echo
+            echo '```text'
+            tail -n 100 host-candidate-challenge-malus.log 2>/dev/null || true
+            echo '```'
+          } > docs/HOST_CANDIDATE_CHALLENGE_MALUS_STATUS.md
+          git add docs/HOST_CANDIDATE_CHALLENGE_MALUS_STATUS.md
+          git commit -m "[skip ci] Record host candidate and challenge malus status" || exit 0
+          git push origin main
+
+      - name: Fail unsuccessful verification
+        if: always() && (steps.config.outcome != 'success' || steps.flow.outcome != 'success')
+        run: exit 1
