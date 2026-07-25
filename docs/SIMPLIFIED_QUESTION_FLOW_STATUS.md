@@ -1,8 +1,8 @@
 # Vereinfachter Fragesteller-Ablauf
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-25T17:03:38Z
-- Commit: df1d0424ce54228ebd537336e732e1b3901b119a
+- Zeitpunkt (UTC): 2026-07-25T19:07:01Z
+- Commit: 72f79c4f230499100de1644d18c3ed4c0e504ac1
 - Browser-Konfiguration: success
 - Ohne Profilwahl, André-Bestätigung und automatisches Weiterschalten: success
 
