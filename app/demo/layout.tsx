@@ -19,6 +19,7 @@ import "./round-transition-finale.css";
 import "./popup-lobby-fix.css";
 import "./host-secret-round-controls.css";
 import "./player-role-recall.css";
+import "./host-player-recovery.css";
 import PlayerResumeGateway from "./PlayerResumeGateway";
 import HostResumeGateway from "./HostResumeGateway";
 import GameIntegrityOverlay from "./GameIntegrityOverlay";
@@ -28,6 +29,7 @@ import RoundTransitionFinaleOverlay from "./RoundTransitionFinaleOverlay";
 import ResultPopupCloseController from "./ResultPopupCloseController";
 import HostSecretRoundControls from "./HostSecretRoundControls";
 import PlayerRoleRecall from "./PlayerRoleRecall";
+import HostPlayerRecoveryPanel from "./HostPlayerRecoveryPanel";
 
 export default function DemoLayout({
   children,
@@ -38,6 +40,7 @@ export default function DemoLayout({
       data-host-resume-version="host-pin-v1"
       data-host-resume-verification="production-v2"
       data-player-role-recall-version="private-popup-v1"
+      data-host-player-recovery-version="manual-action-v1"
       data-core-game-flow="restored-v1"
       data-question-flow-version="offline-team-choice-v1"
       data-advantage-flow-version="host-selected-integrated-v2"
@@ -56,6 +59,7 @@ export default function DemoLayout({
       <ResultPopupCloseController />
       <HostSecretRoundControls />
       <PlayerRoleRecall />
+      <HostPlayerRecoveryPanel />
       {children}
     </div>
   );
