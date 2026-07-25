@@ -1,0 +1,129 @@
+name: Verify host player recovery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-host-player-recovery.yml"
+      - "app/demo/HostPlayerRecoveryPanel.tsx"
+      - "app/demo/host-player-recovery.css"
+      - "app/demo/layout.tsx"
+      - "supabase/migrations/20260724155000_host_player_manual_recovery.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      TESTED_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Resolve browser key
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          key=$(node <<'NODE'
+          const keys = require('./api-keys.json');
+          const item = keys.find((entry) => entry.type === 'publishable') ?? keys.find((entry) => entry.name === 'anon');
+          if (!item?.api_key) process.exit(1);
+          process.stdout.write(item.api_key);
+          NODE
+          )
+          echo "::add-mask::$key"
+          echo "SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "SUPABASE_KEY=$key" >> "$GITHUB_ENV"
+      - name: Verify frontend and production RPC
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+          node <<'NODE' 2>&1 | tee host-player-recovery.log
+          const { createClient } = require('@supabase/supabase-js');
+          const makeClient = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+          async function auth(client) { const r = await client.auth.signInAnonymously(); if (r.error) throw r.error; }
+          async function rpc(client, name, args) { const r = await client.rpc(name, args); if (r.error) throw new Error(`${name}: ${r.error.message}`); return r.data; }
+          async function main() {
+            const host = makeClient();
+            const p1 = makeClient();
+            const p2 = makeClient();
+            let gameId;
+            try {
+              await auth(host); await auth(p1); await auth(p2);
+              const created = (await rpc(host, 'create_live_game', { game_title: `Recovery ${Date.now()}`, host_pin: '2486' }))[0];
+              gameId = created.game_id;
+              const code = String(created.join_code);
+              const j1 = (await rpc(p1, 'join_or_resume_live_game', { raw_join_code: code, requested_display_name: `Recovery-A-${Date.now()}`, player_pin: '1111', requested_avatar_path: null }))[0];
+              const j2 = (await rpc(p2, 'join_or_resume_live_game', { raw_join_code: code, requested_display_name: `Recovery-B-${Date.now()}`, player_pin: '2222', requested_avatar_path: null }))[0];
+              await rpc(host, 'draw_random_millionaire', { target_game_id: gameId, excluded_member_id: null });
+              await rpc(host, 'host_rescue_player_action', { target_game_id: gameId, target_member_id: j1.member_id, requested_action: 'role', requested_target_member_id: null, requested_decision: null });
+              const overview = await rpc(host, 'get_live_host_game_overview', { target_game_id: gameId });
+              const player = overview.players.find((entry) => entry.memberId === j1.member_id);
+              if (!player?.roleRevealed) throw new Error('Rollenfreigabe wurde nicht gespeichert.');
+              await rpc(host, 'force_live_game_phase', { target_game_id: gameId, target_round: 1, target_phase: 'voting' });
+              await rpc(host, 'host_rescue_player_action', { target_game_id: gameId, target_member_id: j1.member_id, requested_action: 'vote', requested_target_member_id: j2.member_id, requested_decision: null });
+              const control = await rpc(host, 'get_live_host_round_control', { target_game_id: gameId });
+              const vote = control.votes.find((entry) => entry.voterMemberId === j1.member_id && entry.accusedMemberId === j2.member_id);
+              if (!vote) throw new Error('Ersatzstimme wurde nicht gespeichert.');
+              console.log('Rolle und Ersatzstimme erfolgreich manuell ausgeführt.');
+              await rpc(host, 'delete_own_live_game', { target_game_id: gameId });
+              gameId = undefined;
+            } finally {
+              if (gameId) { try { await rpc(host, 'delete_own_live_game', { target_game_id: gameId }); } catch {} }
+            }
+          }
+          main().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+      - name: Record status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          status="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$VERIFY_OUTCOME" != "success" ]]; then status="fehlgeschlagen"; fi
+          {
+            echo "# Spielleiter-Spieler-Notfallsteuerung"
+            echo
+            echo "- Status: $status"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $TESTED_SHA"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Build und echte Host-Ersatzaktionen: $VERIFY_OUTCOME"
+            echo
+            echo '```text'
+            tail -n 60 host-player-recovery.log 2>/dev/null || true
+            echo '```'
+          } > docs/HOST_PLAYER_RECOVERY_STATUS.md
+          git add docs/HOST_PLAYER_RECOVERY_STATUS.md
+          git commit -m "[skip ci] Record host player recovery status" || exit 0
+          git push origin main
+      - name: Fail unsuccessful check
+        if: always() && (steps.config.outcome != 'success' || steps.verify.outcome != 'success')
+        run: exit 1
