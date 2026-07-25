@@ -17,12 +17,14 @@ import "./simplified-question-flow.css";
 import "./host-selected-advantage-flow.css";
 import "./round-transition-finale.css";
 import "./popup-lobby-fix.css";
+import "./host-secret-round-controls.css";
 import PlayerResumeGateway from "./PlayerResumeGateway";
 import GameIntegrityOverlay from "./GameIntegrityOverlay";
 import SimplifiedQuestionFlow from "./SimplifiedQuestionFlow";
 import HostSelectedAdvantageFlow from "./HostSelectedAdvantageFlow";
 import RoundTransitionFinaleOverlay from "./RoundTransitionFinaleOverlay";
 import ResultPopupCloseController from "./ResultPopupCloseController";
+import HostSecretRoundControls from "./HostSecretRoundControls";
 
 export default function DemoLayout({
   children,
@@ -36,6 +38,8 @@ export default function DemoLayout({
       data-round-transition-version="closable-lobby-v2"
       data-finale-version="ranking-v2"
       data-popup-flow-version="closable-lobby-v1"
+      data-host-candidate-version="reroll-v1"
+      data-challenge-malus-version="three-votes-v1"
     >
       <PlayerResumeGateway />
       <GameIntegrityOverlay />
@@ -43,6 +47,7 @@ export default function DemoLayout({
       <HostSelectedAdvantageFlow />
       <RoundTransitionFinaleOverlay />
       <ResultPopupCloseController />
+      <HostSecretRoundControls />
       {children}
     </div>
   );
