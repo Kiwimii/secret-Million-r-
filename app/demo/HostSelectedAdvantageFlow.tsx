@@ -93,6 +93,7 @@ function asString(value: unknown) {
 export default function HostSelectedAdvantageFlow() {
   const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
   const refreshingRef = useRef(false);
+  const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string } | null>(null);
   const [identity, setIdentity] = useState<Identity>();
   const [summary, setSummary] = useState<Summary>();
   const [privateState, setPrivateState] = useState<PrivateState>();
@@ -222,6 +223,15 @@ export default function HostSelectedAdvantageFlow() {
 
   useEffect(() => {
     const setup = setups.find((entry) => entry.round === selectedRound);
+    const setupKey = `${selectedRound}:${setup?.missionId ?? ""}:${setup?.advantageId ?? ""}`;
+    const previousHydration = selectionHydrationRef.current;
+    const roundChanged = previousHydration?.round !== selectedRound;
+    const savedSetupChanged = Boolean(setup?.missionId && setup?.advantageId)
+      && previousHydration?.setupKey !== setupKey;
+
+    if (!roundChanged && !savedSetupChanged) return;
+
+    selectionHydrationRef.current = { round: selectedRound, setupKey };
     setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
     setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
   }, [selectedRound, setups]);
