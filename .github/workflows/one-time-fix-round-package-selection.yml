@@ -32,40 +32,48 @@ jobs:
           path = Path("app/demo/HostSelectedAdvantageFlow.tsx")
           text = path.read_text(encoding="utf-8")
 
-          old_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-          const refreshingRef = useRef(false);
-          """
-          new_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-          const refreshingRef = useRef(false);
-          const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string }>();
-          """
+          old_refs = "\n".join([
+              "  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);",
+              "  const refreshingRef = useRef(false);",
+              "",
+          ])
+          new_refs = "\n".join([
+              "  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);",
+              "  const refreshingRef = useRef(false);",
+              "  const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string }>();",
+              "",
+          ])
 
-          old_effect = """  useEffect(() => {
-            const setup = setups.find((entry) => entry.round === selectedRound);
-            setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
-            setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
-          }, [selectedRound, setups]);
-          """
-          new_effect = """  useEffect(() => {
-            const setup = setups.find((entry) => entry.round === selectedRound);
-            const setupKey = `${selectedRound}:${setup?.missionId ?? ""}:${setup?.advantageId ?? ""}`;
-            const previousHydration = selectionHydrationRef.current;
-            const roundChanged = previousHydration?.round !== selectedRound;
-            const savedSetupChanged = Boolean(setup?.missionId && setup?.advantageId)
-              && previousHydration?.setupKey !== setupKey;
-
-            if (!roundChanged && !savedSetupChanged) return;
-
-            selectionHydrationRef.current = { round: selectedRound, setupKey };
-            setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
-            setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
-          }, [selectedRound, setups]);
-          """
+          old_effect = "\n".join([
+              "  useEffect(() => {",
+              "    const setup = setups.find((entry) => entry.round === selectedRound);",
+              "    setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? \"\");",
+              "    setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? \"\");",
+              "  }, [selectedRound, setups]);",
+              "",
+          ])
+          new_effect = "\n".join([
+              "  useEffect(() => {",
+              "    const setup = setups.find((entry) => entry.round === selectedRound);",
+              "    const setupKey = `${selectedRound}:${setup?.missionId ?? \"\"}:${setup?.advantageId ?? \"\"}`;",
+              "    const previousHydration = selectionHydrationRef.current;",
+              "    const roundChanged = previousHydration?.round !== selectedRound;",
+              "    const savedSetupChanged = Boolean(setup?.missionId && setup?.advantageId)",
+              "      && previousHydration?.setupKey !== setupKey;",
+              "",
+              "    if (!roundChanged && !savedSetupChanged) return;",
+              "",
+              "    selectionHydrationRef.current = { round: selectedRound, setupKey };",
+              "    setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? \"\");",
+              "    setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? \"\");",
+              "  }, [selectedRound, setups]);",
+              "",
+          ])
 
           if text.count(old_refs) != 1:
-            raise SystemExit("Reference insertion point was not found exactly once.")
+              raise SystemExit("Reference insertion point was not found exactly once.")
           if text.count(old_effect) != 1:
-            raise SystemExit("Selection effect was not found exactly once.")
+              raise SystemExit("Selection effect was not found exactly once.")
 
           text = text.replace(old_refs, new_refs).replace(old_effect, new_effect)
           path.write_text(text, encoding="utf-8")
