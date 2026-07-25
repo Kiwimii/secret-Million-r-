@@ -1,8 +1,8 @@
 # André-Rundenpaket-Leserechte
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-25T17:38:25Z
-- Commit: c75e86fb5bbbcf14a4d70f7d45cf95479966a661
+- Zeitpunkt (UTC): 2026-07-25T19:06:53Z
+- Commit: 72f79c4f230499100de1644d18c3ed4c0e504ac1
 - Browser-Konfiguration: success
 - André liest Vorteil / Spieler bleibt ausgeschlossen: success
 
