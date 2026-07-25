@@ -1,8 +1,8 @@
 # Host-Kandidat-und-Challenge-Malus-Prüfung
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-25T05:29:34Z
-- Commit: 5b007815470e2a75eec414ebcea5b16e1cbfb21c
+- Zeitpunkt (UTC): 2026-07-25T17:03:41Z
+- Commit: df1d0424ce54228ebd537336e732e1b3901b119a
 - Browser-Konfiguration: success
 - Korkenweitergabe, Ersatz-Auslosung, Host-Bestätigung und +3 Malus: success
 
