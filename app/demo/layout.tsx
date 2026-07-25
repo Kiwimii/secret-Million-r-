@@ -34,7 +34,7 @@ export default function DemoLayout({
     <div
       data-player-resume-version="profile-dropdown-v2"
       data-host-resume-version="host-pin-v1"
-      data-host-resume-verification="production-v1"
+      data-host-resume-verification="production-v2"
       data-core-game-flow="restored-v1"
       data-question-flow-version="offline-team-choice-v1"
       data-advantage-flow-version="host-selected-integrated-v2"
