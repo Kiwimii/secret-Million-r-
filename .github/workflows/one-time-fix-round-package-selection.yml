@@ -1,0 +1,84 @@
+name: Apply isolated round package selection fix
+
+on:
+  push:
+    branches:
+      - agent/fix-round-package-selection
+    paths:
+      - .github/workflows/one-time-fix-round-package-selection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-round-package-selection
+          fetch-depth: 0
+
+      - name: Preserve unsaved dropdown choices during polling
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("app/demo/HostSelectedAdvantageFlow.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          old_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+            const refreshingRef = useRef(false);
+          """.replace("            ", "  ")
+          new_refs = """  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+            const refreshingRef = useRef(false);
+            const selectionHydrationRef = useRef<{ round: RoundNumber; setupKey: string }>();
+          """.replace("            ", "  ")
+
+          old_effect = """  useEffect(() => {
+            const setup = setups.find((entry) => entry.round === selectedRound);
+            setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
+            setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
+          }, [selectedRound, setups]);
+          """.replace("            ", "  ")
+          new_effect = """  useEffect(() => {
+            const setup = setups.find((entry) => entry.round === selectedRound);
+            const setupKey = `${selectedRound}:${setup?.missionId ?? ""}:${setup?.advantageId ?? ""}`;
+            const previousHydration = selectionHydrationRef.current;
+            const roundChanged = previousHydration?.round !== selectedRound;
+            const savedSetupChanged = Boolean(setup?.missionId && setup?.advantageId)
+              && previousHydration?.setupKey !== setupKey;
+
+            if (!roundChanged && !savedSetupChanged) return;
+
+            selectionHydrationRef.current = { round: selectedRound, setupKey };
+            setMissionId(setup?.missionId ?? MISSIONS[0]?.id ?? "");
+            setAdvantageId(setup?.advantageId ?? ADVANTAGES[0]?.id ?? "");
+          }, [selectedRound, setups]);
+          """.replace("            ", "  ")
+
+          if text.count(old_refs) != 1:
+            raise SystemExit("Reference insertion point was not found exactly once.")
+          if text.count(old_effect) != 1:
+            raise SystemExit("Selection effect was not found exactly once.")
+
+          text = text.replace(old_refs, new_refs).replace(old_effect, new_effect)
+          path.write_text(text, encoding="utf-8")
+          Path(".github/workflows/one-time-fix-round-package-selection.yml").unlink()
+
+      - name: Validate focused change
+        run: |
+          npm install
+          npm run typecheck
+          npm run lint
+          npm test -- --runInBand
+          npm run build
+
+      - name: Commit focused fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/demo/HostSelectedAdvantageFlow.tsx .github/workflows/one-time-fix-round-package-selection.yml
+          git commit -m "Keep round package dropdown selections stable"
+          git push origin HEAD:agent/fix-round-package-selection
