@@ -331,13 +331,17 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
 
           <Card eyebrow="Ablauf" title="Zentrale Rundensteuerung">
             <div className={styles.controlFlow}>
-              <button onClick={() => void run("draw", () => controller.drawMillionaire(Boolean(round.millionaireId)))} disabled={!['lobby','round_setup'].includes(view.phase)}>{round.millionaireId ? "Notfall: neu auslosen" : "Millionär zufällig auslosen"}</button>
+              <button onClick={() => {
+                const redraw = Boolean(round.millionaireId);
+                if (redraw && !window.confirm("Die bisherige Rollenfreigabe wird ungültig. Millionär wirklich zufällig neu auslosen?")) return;
+                void run("draw", () => controller.drawMillionaire(redraw));
+              }} disabled={['voting_open','reveal_ready','report','role_decision','finished'].includes(view.phase)}>{round.millionaireId ? "Notfall: neu auslosen" : "Millionär zufällig auslosen"}</button>
               <button onClick={() => void run("roles", () => controller.releaseRoles())} disabled={!round.millionaireId || Boolean(round.roleReleased)}>Rollen freigeben</button>
               <button onClick={() => void run("mission", () => controller.publishMission())} disabled={!round.roleReleased || Boolean(round.missionPublished)}>Mission ausgeben</button>
               <button onClick={() => void run("teams", () => controller.drawTeams())} disabled={!round.missionPublished || Boolean(round.challengePublished)}>Teams & Challenge veröffentlichen</button>
-              <button onClick={() => void run("missionok", () => controller.setMissionStatus("completed"))} disabled={!round.challengePublished}>Mission erfüllt</button>
-              <button onClick={() => void run("missionfail", () => controller.setMissionStatus("failed"))} disabled={!round.challengePublished}>Mission gescheitert</button>
-              <button onClick={() => void run("neutral", () => controller.setMissionStatus("neutral"))} disabled={!round.challengePublished}>Neutral abschließen</button>
+              <button onClick={() => void run("missionok", () => controller.setMissionStatus("completed"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Mission erfüllt</button>
+              <button onClick={() => void run("missionfail", () => controller.setMissionStatus("failed"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Mission gescheitert</button>
+              <button onClick={() => void run("neutral", () => controller.setMissionStatus("neutral"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Neutral abschließen</button>
               <button onClick={() => void run("voteopen", () => controller.openVoting())} disabled={!['completed','failed','neutral'].includes(round.missionStatus ?? "pending") || view.phase === "voting_open"}>Abstimmung öffnen</button>
               <button className={styles.dangerButton} onClick={() => void run("voteclose", () => controller.closeVoting())} disabled={view.phase !== "voting_open"}>Abstimmung schließen ({submitted}/{activeCandidates.length})</button>
               <button onClick={() => setRevealOpen(true)} disabled={!round.result}>Auszählung starten</button>
@@ -349,7 +353,7 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
 
           <Card id="challenge" eyebrow="Challenge" title="Teams und Ergebnis">
             {!round.challengePublished ? <p className={styles.placeholder}>Challenge und Teams sind noch nicht öffentlich.</p> : (
-              <><h3>{round.challenge?.title}</h3><p>{round.challenge?.briefing}</p><div className={styles.teamGrid}><TeamPanel team="azur" view={view} round={round} /><TeamPanel team="gold" view={view} round={round} /></div><div className={styles.inlineActions}><button onClick={() => void controller.setChallengeWinner("azur")}>Team Azur gewinnt</button><button onClick={() => void controller.setChallengeWinner("gold")}>Team Gold gewinnt</button></div></>
+              <><h3>{round.challenge?.title}</h3><p>{round.challenge?.briefing}</p><div className={styles.teamGrid}><TeamPanel team="azur" view={view} round={round} /><TeamPanel team="gold" view={view} round={round} /></div><div className={styles.inlineActions}><button disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner("azur")}>Team Azur gewinnt</button><button disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner("gold")}>Team Gold gewinnt</button></div></>
             )}
           </Card>
 
@@ -377,7 +381,7 @@ function HostMemberRow({ member, controller }: { member: MetaMember; controller:
   return (
     <div className={styles.hostMemberRow}>
       <span className={styles.avatar}>{member.displayName[0]}</span>
-      <div><strong>{member.displayName}</strong><small>{memberStatus(member)} · ab Runde {member.activeFromRound}</small></div>
+      <div><strong>{member.displayName}</strong><small>{memberStatus(member)} · ab Runde {member.activeFromRound} · {member.points ?? 0} Punkte</small></div>
       <select value={member.attendanceStatus} onChange={(e) => void controller.setMemberStatus({ memberId: member.id, attendanceStatus: e.target.value as MetaMember["attendanceStatus"] })}><option value="present">Anwesend</option><option value="temporarily_absent">Abwesend</option><option value="departed">Abgereist</option></select>
       <select value={member.competitionStatus} onChange={(e) => void controller.setMemberStatus({ memberId: member.id, competitionStatus: e.target.value as MetaMember["competitionStatus"] })}><option value="eligible">Aktiv</option><option value="eliminated">Ausgeschieden</option><option value="disqualified">Disqualifiziert</option></select>
     </div>

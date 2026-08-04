@@ -1,0 +1,350 @@
+name: Verify Secret Millionär V2 live
+
+on:
+  workflow_run:
+    workflows: ["Deploy browser test"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-meta-v2-live.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-meta-v2-live
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      LIVE_URL: https://kiwimii.github.io/secret-Million-r-/demo/
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve browser configuration
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+
+          curl --fail --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"external_anonymous_users_enabled":true}' \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/auth" \
+            --output auth-config.json
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const key = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!key?.api_key) process.exit(1);
+          process.stdout.write(key.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Verify complete V2 game flow
+        id: backend
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${NEXT_PUBLIC_SUPABASE_URL:-}"
+          test -n "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}"
+          node <<'NODE'
+          const { createClient } = require('@supabase/supabase-js');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          function makeClient() {
+            return createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+              { auth: { persistSession: false, autoRefreshToken: false } },
+            );
+          }
+
+          async function auth(client) {
+            const result = await client.auth.signInAnonymously();
+            if (result.error || !result.data.user) throw result.error ?? new Error('Anonymous Auth failed.');
+          }
+
+          async function rpc(client, name, args) {
+            const result = await client.rpc(name, args);
+            if (result.error) throw new Error(`${name}: ${result.error.message}`);
+            return result.data;
+          }
+
+          const roundPackage = (round) => ({
+            mission: {
+              title: `Smoke-Mission ${round}`,
+              task: 'Eine geheime Aufgabe für den automatisierten Live-Test.',
+              successCriteria: 'Die Spielleitung bestätigt den Ausgang.',
+              timeWindow: 'Bis zur Abstimmung',
+            },
+            bonus: round === 1
+              ? { kind: 'add_vote', title: 'Schattenstimme', description: 'Eine zusätzliche Stimme.', selectionMode: 'target' }
+              : { kind: 'none', title: 'Kein Bonus', description: '', selectionMode: 'none' },
+            malus: round === 2
+              ? { kind: 'points_penalty', title: 'Punktmalus', description: 'Ein Punkt Abzug.', amount: 1, selectionMode: 'none' }
+              : { kind: 'none', title: 'Kein Malus', description: '', selectionMode: 'none' },
+            challenge: {
+              title: `Smoke-Challenge ${round}`,
+              briefing: 'Automatisierte Team-Challenge.',
+              winCondition: 'Die Spielleitung bestätigt Team Azur.',
+              duration: '1 Minute',
+              material: 'Keines',
+              safety: 'Keine Risiken.',
+            },
+          });
+
+          async function view(host, gameId) {
+            return rpc(host, 'meta_get_game_view', { target_game_id: gameId });
+          }
+
+          async function verifyAttempt(attempt) {
+            const host = makeClient();
+            const clients = new Map();
+            let gameId;
+            try {
+              await auth(host);
+              const created = await rpc(host, 'meta_create_game', {
+                game_title: `Meta-V2-Smoke-${Date.now()}`,
+                host_pin: '2486',
+                requested_rounds: 2,
+                requested_final_rule: 'classic',
+                requested_notes_visibility: 'host',
+              });
+              gameId = created?.game_id;
+              const joinCode = String(created?.join_code ?? '');
+              if (!gameId || !/^\d{6}$/.test(joinCode)) throw new Error('No valid V2 game returned.');
+
+              const names = ['Alpha', 'Bravo', 'Charlie', 'Delta'];
+              for (const name of names) {
+                const player = makeClient();
+                await auth(player);
+                const joined = await rpc(player, 'meta_join_game', {
+                  raw_join_code: joinCode,
+                  requested_name: `${name}-${String(Date.now()).slice(-5)}`,
+                  player_pin: '1357',
+                  requested_avatar_path: null,
+                });
+                if (!joined?.member_id) throw new Error(`Join failed for ${name}.`);
+                clients.set(joined.member_id, player);
+              }
+
+              await rpc(host, 'meta_host_configure_round', { target_game_id: gameId, round_package: roundPackage(1) });
+              await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+              await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+
+              const beforeRedraw = await view(host, gameId);
+              await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: true });
+              const afterRedraw = await view(host, gameId);
+              if (afterRedraw.currentRoundState.roleReleased !== false) throw new Error('Emergency redraw did not reseal roles.');
+              if (beforeRedraw.members.length > 1 && beforeRedraw.currentRoundState.millionaireId === afterRedraw.currentRoundState.millionaireId) {
+                throw new Error('Emergency redraw did not change the millionaire with multiple candidates.');
+              }
+
+              await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+              await rpc(host, 'meta_host_publish_mission', { target_game_id: gameId });
+              await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
+              await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
+              await rpc(host, 'meta_host_set_mission_status', { target_game_id: gameId, mission_result: 'completed' });
+
+              let current = await view(host, gameId);
+              const millionaire1 = current.currentRoundState.millionaireId;
+              const effectTarget = current.members.find((member) => member.id !== millionaire1 && member.competitionStatus === 'eligible')?.id;
+              if (!millionaire1 || !effectTarget) throw new Error('Millionaire/effect target unavailable.');
+              await rpc(clients.get(millionaire1), 'meta_player_set_effect_selection', {
+                target_game_id: gameId,
+                effect_selection: { targetId: effectTarget },
+              });
+
+              await rpc(host, 'meta_host_open_voting', { target_game_id: gameId });
+
+              const late = makeClient();
+              await auth(late);
+              const lateJoin = await rpc(late, 'meta_join_game', {
+                raw_join_code: joinCode,
+                requested_name: `Echo-${String(Date.now()).slice(-5)}`,
+                player_pin: '2468',
+                requested_avatar_path: null,
+              });
+              clients.set(lateJoin.member_id, late);
+              current = await view(host, gameId);
+              const lateMember = current.members.find((member) => member.id === lateJoin.member_id);
+              if (lateMember?.activeFromRound !== 2) throw new Error('Late joiner was not deferred to round 2.');
+
+              const round1Active = current.members.filter((member) => member.activeFromRound <= 1 && member.competitionStatus === 'eligible');
+              const designated = round1Active[0];
+              for (const member of round1Active) {
+                const target = member.id === designated.id ? round1Active[1] : designated;
+                await rpc(clients.get(member.id), 'meta_submit_vote', { target_game_id: gameId, target_member_id: target.id });
+              }
+              await rpc(host, 'meta_host_close_voting', { target_game_id: gameId });
+              current = await view(host, gameId);
+              if (!current.currentRoundState.result?.eliminatedId) throw new Error('Round 1 result missing.');
+              const eliminatedRound1 = current.currentRoundState.result.eliminatedId;
+              await rpc(host, 'meta_host_publish_result', { target_game_id: gameId });
+              await rpc(host, 'meta_host_advance_round', { target_game_id: gameId });
+
+              await rpc(host, 'meta_host_configure_round', { target_game_id: gameId, round_package: roundPackage(2) });
+              await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+              await rpc(host, 'meta_host_publish_mission', { target_game_id: gameId });
+              await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
+              current = await view(host, gameId);
+              if (!current.currentRoundState.teams?.[eliminatedRound1]) throw new Error('Eliminated present player was excluded from the next challenge.');
+              await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
+              await rpc(host, 'meta_host_set_mission_status', { target_game_id: gameId, mission_result: 'failed' });
+              await rpc(host, 'meta_host_open_voting', { target_game_id: gameId });
+
+              current = await view(host, gameId);
+              const millionaire2 = current.currentRoundState.millionaireId;
+              const round2Voters = current.members.filter((member) =>
+                member.id !== millionaire2
+                && member.activeFromRound <= 2
+                && member.competitionStatus === 'eligible'
+                && member.attendanceStatus === 'present'
+              );
+              if (round2Voters.length < 2) throw new Error('Not enough round 2 voters for missing-vote test.');
+              const round2Target = round2Voters[0];
+              for (const member of round2Voters) {
+                const target = member.id === round2Target.id ? round2Voters[1] : round2Target;
+                await rpc(clients.get(member.id), 'meta_submit_vote', { target_game_id: gameId, target_member_id: target.id });
+              }
+              await rpc(host, 'meta_host_close_voting', { target_game_id: gameId });
+              current = await view(host, gameId);
+              const millionaireScore = current.members.find((member) => member.id === millionaire2)?.points;
+              const round2Score = current.personalHistory?.find?.(() => false);
+              if ((millionaireScore ?? 0) > 2) throw new Error('Impossible score state after missing vote.');
+              const scores = current.currentRoundState.result?.missingVoterIds ?? [];
+              if (!scores.includes(millionaire2)) throw new Error('Missing millionaire vote was not documented.');
+
+              await rpc(host, 'meta_host_publish_result', { target_game_id: gameId });
+              await rpc(host, 'meta_host_advance_round', { target_game_id: gameId });
+              current = await view(host, gameId);
+              if (current.phase !== 'finished') throw new Error('Game did not finish after configured round count.');
+              if (!current.finalResult?.winnerId || current.finalResult.timeline?.length !== 2) throw new Error('Final result/timeline incomplete.');
+              if (!current.finalResult.timeline.every((round) => Array.isArray(round.votes) && Array.isArray(round.scores))) throw new Error('Final vote or score history missing.');
+
+              await rpc(host, 'meta_delete_own_game', { target_game_id: gameId });
+              gameId = undefined;
+              console.log('Secret Millionär V2 complete live flow passed.');
+            } catch (error) {
+              if (gameId) {
+                try { await rpc(host, 'meta_delete_own_game', { target_game_id: gameId }); } catch {}
+              }
+              throw new Error(`Attempt ${attempt}: ${error?.message ?? String(error)}`);
+            }
+          }
+
+          async function verify() {
+            let lastError;
+            for (let attempt = 1; attempt <= 36; attempt += 1) {
+              try {
+                await verifyAttempt(attempt);
+                return;
+              } catch (error) {
+                lastError = error;
+                console.log(`V2 backend not ready (${attempt}/36): ${error.message}`);
+                await sleep(10_000);
+              }
+            }
+            throw lastError ?? new Error('V2 live flow failed.');
+          }
+
+          verify().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Verify public V2 dashboard
+        id: page
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location "$LIVE_URL" --output live-page.html; then
+              grep -qi "Secret" live-page.html
+              grep -qi "Live Dashboard\|Partie erstellen\|Spiel beitreten" live-page.html
+              echo "Public V2 dashboard is reachable."
+              exit 0
+            fi
+            echo "Pages deployment not ready ($attempt/36)."
+            sleep 10
+          done
+          exit 1
+
+      - name: Record V2 verification
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          PAGE_OUTCOME: ${{ steps.page.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          verified_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          overall="erfolgreich"
+          if [[ "$CONFIG_OUTCOME" != "success" || "$BACKEND_OUTCOME" != "success" || "$PAGE_OUTCOME" != "success" ]]; then
+            overall="fehlgeschlagen"
+          fi
+          {
+            echo "# Secret Millionär V2 Live-Prüfung"
+            echo
+            echo "- Status: $overall"
+            echo "- Zeitpunkt (UTC): $verified_at"
+            echo "- Commit: $RELEASE_SHA"
+            echo "- Öffentliche Seite: $LIVE_URL"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- V2 End-to-End-Spieltest: $BACKEND_OUTCOME"
+            echo "- V2 Dashboard HTTP-Prüfung: $PAGE_OUTCOME"
+          } > docs/META_V2_LIVE_STATUS.md
+          git add docs/META_V2_LIVE_STATUS.md
+          if git diff --cached --quiet; then
+            echo "V2 status unchanged."
+          else
+            git commit -m "[skip ci] Record Secret Millionär V2 live status"
+            git push origin main
+          fi
+
+      - name: Fail unsuccessful V2 verification
+        if: always() && (steps.config.outcome != 'success' || steps.backend.outcome != 'success' || steps.page.outcome != 'success')
+        run: exit 1
