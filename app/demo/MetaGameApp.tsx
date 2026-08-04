@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMetaGame } from "@/lib/meta/useMetaGame";
 import type {
   EffectDefinition,
@@ -53,9 +53,10 @@ const DEFAULT_PACKAGE: RoundPackageInput = {
     selectionMode: "none",
   },
   malus: {
-    kind: "remove_self_vote",
+    kind: "points_penalty",
     title: "Riss in der Tarnung",
-    description: "Eine Stimme gegen dich kann nicht neutralisiert werden; der Malus entfernt stattdessen keinen Schutz.",
+    description: "Bei Misserfolg wird dir ein Punkt abgezogen.",
+    amount: 1,
     selectionMode: "none",
   },
   challenge: {
@@ -197,7 +198,7 @@ function EntryScreen({ controller }: { controller: ReturnType<typeof useMetaGame
               <label>Spielleiter-PIN<input inputMode="numeric" type="password" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••" /></label>
             </div>
             <label>Finalregel<select value={finalRule} onChange={(e) => setFinalRule(e.target.value as "classic" | "points")}><option value="classic">Klassisch: Final-Millionär kann direkt gewinnen</option><option value="points">Reine Gesamtpunkte</option></select></label>
-            <label>Notizen<select value={notesVisibility} onChange={(e) => setNotesVisibility(e.target.value as "host" | "private")}><option value="host">Für Spieler und Spielleitung sichtbar</option><option value="private">Nur für den jeweiligen Spieler sichtbar</option></select></label>
+            <label>Notizen<select value={notesVisibility} onChange={(e) => setNotesVisibility(e.target.value as "host" | "private")}><option value="host">Nur für dich und die Spielleitung sichtbar</option><option value="private">Nur für den jeweiligen Spieler sichtbar</option></select></label>
             <button className={styles.primaryButton} disabled={controller.loading}>Partie erstellen</button>
           </form>
         )}
@@ -474,7 +475,21 @@ function RevealOverlay({ view, round, onClose, onPublish }: { view: MetaGameView
 
 function FinalOverlay({ view, onClose }: { view: MetaGameView; onClose(): void }) {
   const final = view.finalResult!;
-  return <Overlay title="Das große Finale" onClose={onClose} dramatic><div className={styles.finalWinner}><span>Gewinner</span><h3>{getName(view, final.winnerId)}</h3><p>{final.reason === "final_millionaire_survived" ? "Der Millionär hat die Finalrunde überlebt." : "Die Gesamtwertung entscheidet."}</p></div><div className={styles.leaderboard}>{final.leaderboard.map((entry, index) => <div key={entry.memberId}><b>#{index + 1}</b><span>{getName(view, entry.memberId)}</span><strong>{entry.points} Punkte</strong><small>{entry.correctGuesses} richtige Tipps</small></div>)}</div><p className={styles.muted}>Alle Rollen, Stimmen, Missionen und Punkte bleiben anschließend im Dashboard nachvollziehbar.</p></Overlay>;
+  return <Overlay title="Das große Finale" onClose={onClose} dramatic>
+    <div className={styles.finalWinner}><span>Gewinner</span><h3>{getName(view, final.winnerId)}</h3><p>{final.reason === "final_millionaire_survived" ? "Der Millionär hat die Finalrunde überlebt." : "Die Gesamtwertung entscheidet."}</p></div>
+    <div className={styles.leaderboard}>{final.leaderboard.map((entry, index) => <div key={entry.memberId}><b>#{index + 1}</b><span>{getName(view, entry.memberId)}</span><strong>{entry.points} Punkte</strong><small>{entry.correctGuesses} richtige Tipps</small></div>)}</div>
+    <div className={styles.finalTimeline}>
+      {final.timeline.map((entry) => <article key={entry.roundNumber}>
+        <div><span>Runde {entry.roundNumber}</span><strong>{entry.roundNumber} Punkte</strong></div>
+        <h4>Millionär: {getName(view, entry.millionaireId)}</h4>
+        <p><b>Mission:</b> {entry.mission?.title ?? "Keine Mission"} · {entry.missionStatus === "completed" ? "erfüllt" : entry.missionStatus === "failed" ? "gescheitert" : "neutral"}</p>
+        <p><b>Ausgeschieden:</b> {getName(view, entry.eliminatedId)}{entry.winningTeam ? ` · Challenge: Team ${entry.winningTeam === "azur" ? "Azur" : "Gold"}` : ""}</p>
+        <div className={styles.finalVotes}>{entry.votes.length === 0 ? <small>Keine Stimmen abgegeben.</small> : entry.votes.map((vote) => <span key={`${entry.roundNumber}-${vote.voterId}`}>{getName(view, vote.voterId)} → {getName(view, vote.targetId)}</span>)}</div>
+        <div className={styles.finalScores}>{entry.scores.map((score) => <span key={`${entry.roundNumber}-${score.memberId}`}>{getName(view, score.memberId)}: {score.pointsAwarded >= 0 ? "+" : ""}{score.pointsAwarded}{score.correctGuess ? " ✓" : ""}</span>)}</div>
+      </article>)}
+    </div>
+    <p className={styles.muted}>Persönliche Ermittlungsnotizen bleiben auch im Finale privat.</p>
+  </Overlay>;
 }
 
 export default function MetaGameApp() {
