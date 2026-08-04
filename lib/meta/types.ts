@@ -177,6 +177,17 @@ export interface MetaGameView {
     winnerId?: string;
     reason: string;
     leaderboard: Array<{ memberId: string; points: number; correctGuesses: number }>;
+    timeline: Array<{
+      roundNumber: number;
+      millionaireId?: string;
+      eliminatedId?: string;
+      mission?: MissionDefinition;
+      missionStatus?: MissionStatus;
+      winningTeam?: TeamCode;
+      effect?: EffectDefinition & { selection?: Record<string, string> };
+      votes: Array<{ voterId: string; targetId: string }>;
+      scores: Array<{ memberId: string; pointsAwarded: number; correctGuess: boolean }>;
+    }>;
   };
 }
 
