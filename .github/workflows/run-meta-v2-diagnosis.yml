@@ -78,4 +78,4 @@ jobs:
         if: steps.flow.outcome != 'success'
         run: exit 1
 
-# Re-run after the pgcrypto search-path migration.
+# Re-run after the event round overload migration.
