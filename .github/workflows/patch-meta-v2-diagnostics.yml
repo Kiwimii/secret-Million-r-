@@ -47,3 +47,5 @@ jobs:
             git commit -m "Add V2 smoke diagnostics"
             git push origin main
           fi
+
+# Triggered again after initial workflow registration.
