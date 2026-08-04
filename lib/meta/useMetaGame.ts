@@ -112,9 +112,11 @@ export function useMetaGame(): MetaGameController {
   const clientRef = useRef<SupabaseClient | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const identityRef = useRef<MetaIdentity | undefined>(undefined);
-  const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  const [ready, setReady] = useState(!configured);
+  const [loading, setLoading] = useState(configured);
+  const [error, setError] = useState<string | undefined>(
+    configured ? undefined : "Die öffentliche Supabase-Konfiguration fehlt.",
+  );
   const [identity, setIdentityState] = useState<MetaIdentity>();
   const [view, setView] = useState<MetaGameView>();
 
@@ -148,12 +150,7 @@ export function useMetaGame(): MetaGameController {
 
   useEffect(() => {
     let cancelled = false;
-    if (!configured) {
-      setError("Die öffentliche Supabase-Konfiguration fehlt.");
-      setLoading(false);
-      setReady(true);
-      return;
-    }
+    if (!configured) return;
     const client = createClient();
     clientRef.current = client;
     void (async () => {
