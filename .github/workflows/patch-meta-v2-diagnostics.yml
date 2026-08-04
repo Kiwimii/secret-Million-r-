@@ -1,0 +1,49 @@
+name: Patch V2 smoke diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-meta-v2-diagnostics.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Add fast diagnostics to V2 smoke test
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/verify-meta-v2-live.yml')
+          text = path.read_text()
+          text = text.replace("          node <<'NODE'\n", "          node <<'NODE' 2>&1 | tee meta-v2-backend.log\n", 1)
+          text = text.replace('for (let attempt = 1; attempt <= 36; attempt += 1)', 'for (let attempt = 1; attempt <= 3; attempt += 1)')
+          text = text.replace('await sleep(10_000);', 'await sleep(2_000);', 1)
+          text = text.replace('throw lastError ?? new Error(\'V2 live flow failed.\');', 'throw lastError ?? new Error(\'V2 live flow failed after diagnostic retries.\');')
+          needle = '''            echo "- V2 Dashboard HTTP-Prüfung: $PAGE_OUTCOME"\n          } > docs/META_V2_LIVE_STATUS.md\n'''
+          replacement = '''            echo "- V2 Dashboard HTTP-Prüfung: $PAGE_OUTCOME"\n            if [[ -f meta-v2-backend.log ]]; then\n              echo\n              echo "## Letzte V2-Diagnosezeilen"\n              echo '```text'\n              tail -n 40 meta-v2-backend.log\n              echo '```'\n            fi\n          } > docs/META_V2_LIVE_STATUS.md\n'''
+          if needle not in text:
+              raise SystemExit('Status block not found')
+          text = text.replace(needle, replacement)
+          path.write_text(text)
+          PY
+      - name: Commit diagnostic workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/verify-meta-v2-live.yml
+          if git diff --cached --quiet; then
+            echo "Diagnostics already present."
+          else
+            git commit -m "Add V2 smoke diagnostics"
+            git push origin main
+          fi
