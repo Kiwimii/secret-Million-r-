@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import DemoAppFinal from "./DemoAppFinal";
+import MetaGameApp from "./MetaGameApp";
 
 export const metadata: Metadata = {
-  title: "Secret Millionär – Live-Ablauf V3",
-  description:
-    "Mobile Live-Partie mit verbindlichem Challenge-, Fragen-, Missions- und Vorteilssystem.",
+  title: "Secret Millionär – Live Dashboard",
+  description: "Vollständige Mehrgeräte-Partie mit dauerhaftem Spieler-Dashboard, Spielleitersteuerung, Benachrichtigungen und Finale.",
 };
 
 export default function DemoPage() {
-  return (
-    <div data-visual-version="midnight-fortune-v3" data-live-flow="authoritative">
-      <DemoAppFinal />
-    </div>
-  );
+  return <MetaGameApp />;
 }
