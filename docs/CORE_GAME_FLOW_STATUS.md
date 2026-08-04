@@ -1,8 +1,8 @@
 # Von André festgelegter Vorteilsablauf
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-07-25T19:07:13Z
-- Commit: 72f79c4f230499100de1644d18c3ed4c0e504ac1
+- Zeitpunkt (UTC): 2026-08-04T23:05:12Z
+- Commit: a026a0d9d37621b16e6e78398982f43d8e28dc8c
 - Browser-Konfiguration: success
 - André-Festlegung, Missionserfolg, Millionärsanwendung und Abstimmung: success
 
