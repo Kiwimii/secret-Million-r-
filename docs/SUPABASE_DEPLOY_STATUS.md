@@ -1,8 +1,8 @@
 # Supabase-Datenbank-Deployment
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-08-04T23:14:20Z
-- Commit: 7fafddd18e8c64b80ad38707ce5ce5bab1fe0779
+- Zeitpunkt (UTC): 2026-08-04T23:32:17Z
+- Commit: c6310a2a0bc95010f61351eb22ef91f6f1a87193
 - Secrets geprüft: success
 - Projektverknüpfung: success
 - Migrationsvorschau: success
@@ -18,16 +18,16 @@ DRY RUN: migrations will *not* be pushed to the database.
 Using database password *** env var...
 Connecting to remote database...
 Would push these migrations:
- • [1m20260805010800_meta_game_v2_hardening.sql[22m
+ • [1m20260805010900_meta_game_v2_pgcrypto_path.sql[22m
 Finished [36msupabase db push[39m.
 --- supabase-apply.log ---
 NotFound: FileSystem.readFile (/home/runner/.supabase/profile)
 Using database password *** env var...
 Connecting to remote database...
 Do you want to push these migrations to the remote database?
- • [1m20260805010800_meta_game_v2_hardening.sql[22m
+ • [1m20260805010900_meta_game_v2_pgcrypto_path.sql[22m
  [Y/n] 
-Applying migration 20260805010800_meta_game_v2_hardening.sql...
+Applying migration 20260805010900_meta_game_v2_pgcrypto_path.sql...
 v1.74.2: Pulling from supabase/edge-runtime
 b9136609bef0: Pulling fs layer
 bfab333b5e81: Pulling fs layer
@@ -35,8 +35,9 @@ be4c37910e5f: Pulling fs layer
 724041fce750: Pulling fs layer
 abecb94bba46: Pulling fs layer
 0367cb7f5023: Pulling fs layer
-724041fce750: Waiting
 abecb94bba46: Waiting
+0367cb7f5023: Waiting
+724041fce750: Waiting
 be4c37910e5f: Verifying Checksum
 be4c37910e5f: Download complete
 b9136609bef0: Verifying Checksum
