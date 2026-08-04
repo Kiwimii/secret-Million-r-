@@ -1,8 +1,8 @@
 # Autoritativer Live-Partie-Smoke-Test
 
 - Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-08-04T23:34:10Z
-- Commit: c6310a2a0bc95010f61351eb22ef91f6f1a87193
+- Zeitpunkt (UTC): 2026-08-04T23:38:40Z
+- Commit: 743eb84918fa7e9b2852cab5480c372b60619df3
 - Browser-Konfiguration: success
 - Vollständiger Runden-, Missions-, Vorteil- und Notfallablauf: failure
 
