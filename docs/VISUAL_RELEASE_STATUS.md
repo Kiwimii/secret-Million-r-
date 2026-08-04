@@ -1,8 +1,8 @@
 # Visual-Experience-V8-Prüfung
 
 - Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-08-04T23:33:12Z
-- Commit: 747c58ee343d6cf2a7cea8265dfae8336cc79a63
+- Zeitpunkt (UTC): 2026-08-04T23:37:59Z
+- Commit: c6310a2a0bc95010f61351eb22ef91f6f1a87193
 - Öffentliche Seite: https://kiwimii.github.io/secret-Million-r-/demo/
 - V3-Design und verbindlicher Live-Ablauf: cancelled
 - Wiederhergestellter Kernablauf im HTML: cancelled
