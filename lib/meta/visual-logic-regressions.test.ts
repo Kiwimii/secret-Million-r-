@@ -20,7 +20,7 @@ describe("Akte Midas visual and logic audit", () => {
     expect(app).toContain("const nextStep");
     expect(app).toContain("const availableParticipants");
     expect(app).toContain("entry.minPlayers > availableCount");
-    expect(app).toContain("!packageCompatible");
+    expect(app).toContain("isBusy || !packageCompatible");
     expect(app).toContain("!round.winningTeam");
   });
 
