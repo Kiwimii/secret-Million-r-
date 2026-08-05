@@ -1,0 +1,378 @@
+name: Apply intro and stability audit
+
+on:
+  push:
+    branches: [agent/intro-stability-audit]
+    paths:
+      - ".github/workflows/apply-intro-stability-audit.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/intro-stability-audit
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Apply focused code fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"Missing patch target: {label}")
+              return text.replace(old, new, 1)
+
+          app_path = Path('app/demo/AkteMidasApp.tsx')
+          app = app_path.read_text()
+          app = replace_once(app,
+              'import { useEffect, useMemo, useState } from "react";',
+              'import { useEffect, useId, useMemo, useRef, useState } from "react";',
+              'react imports')
+          app = replace_once(app,
+              'const INTRO_STORAGE_KEY = "secret-millionaer.akte-midas.intro.v1";\n',
+              '''const INTRO_STORAGE_KEY = "secret-millionaer.akte-midas.intro.v1";
+const INTRO_STEP_MS = 5200;
+const INTRO_SCENES = [
+  { code: "VERBINDUNG", title: "Sichere Verbindung wird hergestellt", body: "Verschlüsselung aktiv. Vertrauen weiterhin deaktiviert." },
+  { code: "AKTE MIDAS", title: "Zugriff vorläufig genehmigt", body: "Eine Person in diesem Raum ist der Millionär. Die übrigen besitzen immerhin Meinungen." },
+  { code: "PROTOKOLL", title: "Beobachten. Täuschen. Abstimmen.", body: "Wer richtig liegt, erhält Punkte. Wer falsch liegt, erhält Erfahrung. Die Zentrale bewertet beides unterschiedlich." },
+  { code: "EINSATZ", title: "Jede Runde erhöht den Preis", body: "Missionen bleiben geheim. Verdächtigungen selten. Fehlentscheidungen werden dauerhaft archiviert." },
+  { code: "FREIGABE", title: "Vertrauen ist gestattet", body: "Beweise werden bevorzugt." },
+] as const;
+''',
+              'intro constants')
+          app = replace_once(app,
+              'function MidasMark({ compact = false }: { compact?: boolean }) {\n  return (',
+              'function MidasMark({ compact = false }: { compact?: boolean }) {\n  const gradientId = useId().replace(/:/g, "");\n  return (',
+              'unique midas gradient')
+          app = app.replace('id="midasGold"', 'id={gradientId}')
+          app = app.replace('stroke="url(#midasGold)"', 'stroke={`url(#${gradientId})`}')
+          app = replace_once(app,
+              'function OperativeSilhouettes() {\n  return (',
+              'function OperativeSilhouettes() {\n  const gradientId = useId().replace(/:/g, "");\n  return (',
+              'unique silhouettes gradient')
+          app = app.replace('id="fadeAgents"', 'id={gradientId}')
+          app = app.replace('fill="url(#fadeAgents)"', 'fill={`url(#${gradientId})`}')
+          app = replace_once(app,
+              '  dramatic?: boolean;\n}) {\n  return (',
+              '''  dramatic?: boolean;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  return (''',
+              'overlay escape handling')
+
+          intro_start = app.index('function IntroSequence(')
+          intro_end = app.index('function OperationBriefing(', intro_start)
+          intro_block = '''function IntroSequence({ onClose }: { onClose(): void }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (step >= INTRO_SCENES.length - 1) return;
+    let timer: number | undefined;
+    const schedule = () => {
+      if (document.visibilityState === "visible") {
+        timer = window.setTimeout(() => setStep((current) => Math.min(current + 1, INTRO_SCENES.length - 1)), INTRO_STEP_MS);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (timer) window.clearTimeout(timer);
+      schedule();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [step]);
+
+  const scene = INTRO_SCENES[step];
+  return (
+    <main className={styles.intro}>
+      <button className={styles.introClose} onClick={onClose} aria-label="Intro schließen">×</button>
+      <div className={styles.introGrid} />
+      <OperativeSilhouettes />
+      <section className={styles.introContent} aria-live="polite">
+        <MidasMark />
+        <div className={styles.classifiedStamp}>VERTRAULICH</div>
+        <p className={styles.kicker}>{scene.code}</p>
+        <h1>{scene.title}</h1>
+        <p>{scene.body}</p>
+        <div className={styles.introProgress}>{INTRO_SCENES.map((_, index) => <button key={index} onClick={() => setStep(index)} className={index <= step ? styles.activeProgress : ""} aria-label={`Introszene ${index + 1}`} />)}</div>
+        <button className={styles.primaryButton} onClick={onClose}>{step === INTRO_SCENES.length - 1 ? "Akte öffnen" : "Intro überspringen"}</button>
+        <small>Die Zentrale wünscht einen diskreten Abend. Erfahrungsgemäß ist es dafür bereits zu spät.</small>
+      </section>
+    </main>
+  );
+}
+
+'''
+          app = app[:intro_start] + intro_block + app[intro_end:]
+          app = app.replace('setDismissed([...dismissed, popup.id])', 'setDismissed((current) => current.includes(popup.id) ? current : [...current, popup.id])')
+
+          app = replace_once(app,
+              '  const [busyAction, setBusyAction] = useState<string>();\n',
+              '  const [busyAction, setBusyAction] = useState<string>();\n  const busyRef = useRef(false);\n',
+              'host busy ref')
+          old_effect = '''  useEffect(() => {
+    setMissionId(round.mission?.catalogId ?? MISSION_CATALOG.find((entry) => entry.title === round.mission?.title)?.catalogId ?? "M01");
+    setChallengeId(round.challenge?.catalogId ?? CHALLENGE_CATALOG.find((entry) => entry.title === round.challenge?.title)?.catalogId ?? "C01");
+    setBonusId(round.bonus?.catalogId ?? BONUS_CATALOG.find((entry) => entry.title === round.bonus?.title)?.catalogId ?? "B01");
+    setMalusId(round.malus?.catalogId ?? MALUS_CATALOG.find((entry) => entry.title === round.malus?.title)?.catalogId ?? "X03");
+  }, [view.currentRound, round.mission, round.challenge, round.bonus, round.malus]);'''
+          new_effect = '''  const storedMissionId = round.mission?.catalogId ?? MISSION_CATALOG.find((entry) => entry.title === round.mission?.title)?.catalogId ?? "M01";
+  const storedChallengeId = round.challenge?.catalogId ?? CHALLENGE_CATALOG.find((entry) => entry.title === round.challenge?.title)?.catalogId ?? "C01";
+  const storedBonusId = round.bonus?.catalogId ?? BONUS_CATALOG.find((entry) => entry.title === round.bonus?.title)?.catalogId ?? "B01";
+  const storedMalusId = round.malus?.catalogId ?? MALUS_CATALOG.find((entry) => entry.title === round.malus?.title)?.catalogId ?? "X03";
+  useEffect(() => {
+    setMissionId(storedMissionId);
+    setChallengeId(storedChallengeId);
+    setBonusId(storedBonusId);
+    setMalusId(storedMalusId);
+  }, [view.currentRound, storedMissionId, storedChallengeId, storedBonusId, storedMalusId]);'''
+          app = replace_once(app, old_effect, new_effect, 'stable host catalog hydration')
+          app = replace_once(app,
+              '  async function run(name: string, action: () => Promise<void>) { setBusyAction(name); try { await action(); } finally { setBusyAction(undefined); } }\n',
+              '''  async function run(name: string, action: () => Promise<void>) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusyAction(name);
+    try { await action(); } catch { /* useMetaGame exposes the actionable error in the dashboard */ }
+    finally { busyRef.current = false; setBusyAction(undefined); }
+  }
+''',
+              'host action lock')
+          app = replace_once(app,
+              '  const submitted = activeCandidates.filter((member) => member.voteSubmitted).length;\n',
+              '  const submitted = activeCandidates.filter((member) => member.voteSubmitted).length;\n  const isBusy = Boolean(busyAction);\n',
+              'host busy state')
+          app = app.replace('disabled={!\'lobby\',\'round_setup\'.includes(view.phase) || busyAction === "configure"}', 'disabled={isBusy || ![\'lobby\',\'round_setup\'].includes(view.phase)}')
+          app = app.replace("disabled={['voting_open','reveal_ready','report','role_decision','finished'].includes(view.phase)}", "disabled={isBusy || ['voting_open','reveal_ready','report','role_decision','finished'].includes(view.phase)}")
+          app = app.replace('disabled={!round.millionaireId || Boolean(round.roleReleased)}', 'disabled={isBusy || !round.millionaireId || Boolean(round.roleReleased)}')
+          app = app.replace('disabled={!round.roleReleased || Boolean(round.missionPublished)}', 'disabled={isBusy || !round.roleReleased || Boolean(round.missionPublished)}')
+          app = app.replace('disabled={!round.missionPublished || Boolean(round.challengePublished)}', 'disabled={isBusy || !round.missionPublished || Boolean(round.challengePublished)}')
+          app = app.replace("disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}", "disabled={isBusy || !round.challengePublished || !['challenge','mission_review'].includes(view.phase)}")
+          app = app.replace("disabled={!['completed','failed','neutral'].includes(round.missionStatus ?? \"pending\") || view.phase === \"voting_open\"}", "disabled={isBusy || !round.winningTeam || !['completed','failed','neutral'].includes(round.missionStatus ?? \"pending\") || view.phase === \"voting_open\"}")
+          app = app.replace('disabled={view.phase !== "voting_open"}', 'disabled={isBusy || view.phase !== "voting_open"}')
+          app = app.replace('disabled={!round.result}', 'disabled={isBusy || !round.result}')
+          app = app.replace('disabled={!round.result || Boolean(round.resultPublished)}', 'disabled={isBusy || !round.result || Boolean(round.resultPublished)}')
+          app = app.replace('disabled={!round.resultPublished}', 'disabled={isBusy || !round.resultPublished}')
+          app = app.replace("disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner(\"azur\")}", "disabled={isBusy || !['challenge','mission_review'].includes(view.phase)} onClick={() => void run(\"challenge-azur\", () => controller.setChallengeWinner(\"azur\"))}")
+          app = app.replace("disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner(\"gold\")}", "disabled={isBusy || !['challenge','mission_review'].includes(view.phase)} onClick={() => void run(\"challenge-gold\", () => controller.setChallengeWinner(\"gold\"))}")
+
+          effect_start = app.index('function EffectSelection(')
+          effect_end = app.index('function PlayerDashboard(', effect_start)
+          effect_block = '''function EffectSelection({ view, round, controller }: { view: MetaGameView; round: MetaRoundState; controller: ReturnType<typeof useMetaGame> }) {
+  const effect = round.missionStatus === "completed" ? round.bonus : round.missionStatus === "failed" ? round.malus : undefined;
+  const [voterId, setVoterId] = useState(round.effectSelection?.voterId ?? "");
+  const [targetId, setTargetId] = useState(round.effectSelection?.targetId ?? "");
+  useEffect(() => {
+    setVoterId(round.effectSelection?.voterId ?? "");
+    setTargetId(round.effectSelection?.targetId ?? "");
+  }, [round.number, round.effectSelection?.voterId, round.effectSelection?.targetId]);
+  if (!effect || effect.kind === "none" || effect.selectionMode === "none") return null;
+  const selectable = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound && member.id !== view.memberId);
+  const requiresVoter = ["voter", "source_and_target"].includes(effect.selectionMode ?? "");
+  const requiresTarget = ["target", "source_and_target"].includes(effect.selectionMode ?? "");
+  const selectionComplete = (!requiresVoter || Boolean(voterId)) && (!requiresTarget || Boolean(targetId));
+  return <div className={styles.effectSelection}><h4>Effektziel festlegen: {effect.title}</h4>{requiresVoter && <label>Betroffener Wähler<select value={voterId} onChange={(event) => setVoterId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}{requiresTarget && <label>Zielperson<select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}<button disabled={!selectionComplete} onClick={() => void controller.setEffectSelection({ voterId, targetId })}>Auswahl verriegeln</button>{!selectionComplete && <small>Ohne vollständige Auswahl verfällt der Effekt beim Abstimmungsschluss.</small>}</div>;
+}
+
+'''
+          app = app[:effect_start] + effect_block + app[effect_end:]
+
+          app_start = app.index('export default function AkteMidasApp()')
+          app_tail = '''export default function AkteMidasApp() {
+  const controller = useMetaGame();
+  const [storageReady, setStorageReady] = useState(false);
+  const [introSeen, setIntroSeen] = useState(false);
+  const briefingKey = controller.identity ? `secret-millionaer.akte-midas.briefing.${controller.identity.gameId}.${controller.identity.accessRole}` : "";
+  const [briefingSeen, setBriefingSeen] = useState(false);
+  const [briefingReady, setBriefingReady] = useState(false);
+  useEffect(() => {
+    setIntroSeen(window.localStorage.getItem(INTRO_STORAGE_KEY) === "seen");
+    setStorageReady(true);
+  }, []);
+  useEffect(() => {
+    if (!briefingKey) { setBriefingSeen(false); setBriefingReady(false); return; }
+    setBriefingSeen(window.localStorage.getItem(briefingKey) === "seen");
+    setBriefingReady(true);
+  }, [briefingKey]);
+  function closeIntro() { window.localStorage.setItem(INTRO_STORAGE_KEY, "seen"); setIntroSeen(true); }
+  function closeBriefing() { if (briefingKey) window.localStorage.setItem(briefingKey, "seen"); setBriefingSeen(true); }
+  if (!storageReady || !controller.ready || (controller.loading && !controller.identity)) return <main className={styles.loading}><MidasMark /><p>Sichere Verbindung wird hergestellt …</p><small>Vertrauen weiterhin deaktiviert.</small></main>;
+  if (!controller.identity || !controller.view) return introSeen ? <EntryScreen controller={controller} /> : <IntroSequence onClose={closeIntro} />;
+  const dashboard = controller.view.isHost ? <HostDashboard view={controller.view} controller={controller} /> : <PlayerDashboard view={controller.view} controller={controller} />;
+  return <>{dashboard}{briefingReady && !briefingSeen && <OperationBriefing isHost={controller.view.isHost} onClose={closeBriefing} />}</>;
+}
+'''
+          app = app[:app_start] + app_tail
+          app_path.write_text(app)
+
+          hook_path = Path('lib/meta/useMetaGame.ts')
+          hook = hook_path.read_text()
+          hook = replace_once(hook,
+              '  const channelRef = useRef<RealtimeChannel | null>(null);\n',
+              '  const channelRef = useRef<RealtimeChannel | null>(null);\n  const loadSequenceRef = useRef(0);\n',
+              'load sequence ref')
+          old_load = '''  const load = useCallback(async (target?: MetaIdentity) => {
+    const active = target ?? identityRef.current;
+    const client = clientRef.current;
+    if (!client || !active) return;
+    const next = await rpc<MetaGameView>(client, "meta_get_game_view", {
+      target_game_id: active.gameId,
+    });
+    setView(next);
+    setError(undefined);
+  }, []);'''
+          new_load = '''  const load = useCallback(async (target?: MetaIdentity) => {
+    const active = target ?? identityRef.current;
+    const client = clientRef.current;
+    if (!client || !active) return;
+    const requestId = ++loadSequenceRef.current;
+    const next = await rpc<MetaGameView>(client, "meta_get_game_view", {
+      target_game_id: active.gameId,
+    });
+    if (requestId !== loadSequenceRef.current || identityRef.current?.gameId !== active.gameId) return;
+    setView((current) => !current || current.gameId !== next.gameId || next.revision >= current.revision ? next : current);
+    setError(undefined);
+  }, []);'''
+          hook = replace_once(hook, old_load, new_load, 'stale load protection')
+          hook = replace_once(hook,
+              '      setError(message);\n      throw caught;\n',
+              '      setError(message);\n',
+              'handled mutation error')
+          hook = replace_once(hook,
+              '  const clearSession = useCallback(async () => {\n',
+              '  const clearSession = useCallback(async () => {\n    loadSequenceRef.current += 1;\n',
+              'session load invalidation')
+          hook_path.write_text(hook)
+
+          live_path = Path('scripts/verify-akte-midas-live.cjs')
+          live = live_path.read_text()
+          live = replace_once(live,
+              "const { createClient } = require('@supabase/supabase-js');\n",
+              "const { randomUUID } = require('node:crypto');\nconst { createClient } = require('@supabase/supabase-js');\n",
+              'random uuid import')
+          live = replace_once(live,
+              '''function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+''',
+              '''function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function expectRpcFailure(client, name, args, expectedText) {
+  const result = await client.rpc(name, args);
+  assert(result.error, `${name} unexpectedly succeeded.`);
+  assert(result.error.message.includes(expectedText), `${name} failed for the wrong reason: ${result.error.message}`);
+}
+''',
+              'rpc failure helper')
+          live = replace_once(live,
+              '''    await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+    const beforeRedraw = await hostView(host, gameId);''',
+              '''    await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    const initialDraw = await hostView(host, gameId);
+    await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    const duplicateDraw = await hostView(host, gameId);
+    assert(initialDraw.currentRoundState.millionaireId === duplicateDraw.currentRoundState.millionaireId, 'A duplicate draw changed the millionaire without confirmation.');
+    await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+    const beforeRedraw = await hostView(host, gameId);''',
+              'duplicate draw test')
+          live = replace_once(live,
+              '''    await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
+    await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
+    await rpc(host, 'meta_host_set_mission_status', { target_game_id: gameId, mission_result: 'completed' });
+
+    view = await hostView(host, gameId);''',
+              '''    await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
+    await rpc(host, 'meta_host_set_mission_status', { target_game_id: gameId, mission_result: 'completed' });
+    await expectRpcFailure(host, 'meta_host_open_voting', { target_game_id: gameId }, 'Siegerteam');
+    await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
+
+    view = await hostView(host, gameId);''',
+              'challenge result gate test')
+          live = replace_once(live,
+              '''    await rpc(players.get(millionaireOne), 'meta_player_set_effect_selection', {
+      target_game_id: gameId,
+      effect_selection: { targetId: effectTarget.id },
+    });''',
+              '''    await expectRpcFailure(players.get(millionaireOne), 'meta_player_set_effect_selection', {
+      target_game_id: gameId,
+      effect_selection: { targetId: randomUUID() },
+    }, 'Zielperson');
+    await rpc(players.get(millionaireOne), 'meta_player_set_effect_selection', {
+      target_game_id: gameId,
+      effect_selection: { targetId: effectTarget.id },
+    });''',
+              'effect target validation test')
+          live = replace_once(live,
+              '''    const alternateTarget = roundOneVoters.find((member) => member.id !== millionaireOne);
+    for (const voter of roundOneVoters) {''',
+              '''    const alternateTarget = roundOneVoters.find((member) => member.id !== millionaireOne && member.id !== effectTarget.id);
+    assert(alternateTarget, 'No distinct target available for deterministic round-one tally.');
+    for (const voter of roundOneVoters) {''',
+              'deterministic eliminated millionaire')
+          live = replace_once(live,
+              '''    const eliminatedOne = roundOneResult.eliminatedId;
+
+    await rpc(host, 'meta_host_publish_result' ''',
+              '''    const eliminatedOne = roundOneResult.eliminatedId;
+    assert(eliminatedOne === millionaireOne, 'Round one did not eliminate the deliberately exposed millionaire.');
+
+    await rpc(host, 'meta_host_publish_result' ''',
+              'eliminated identity assertion')
+          live = replace_once(live,
+              '''    assert(roundOneArchive?.mission?.catalogId === 'M01', 'Final archive lost the mission catalog id.');
+''',
+              '''    assert(roundOneArchive?.mission?.catalogId === 'M01', 'Final archive lost the mission catalog id.');
+    const eliminatedScore = roundOneArchive?.scores?.find((score) => score.memberId === eliminatedOne);
+    assert(eliminatedScore?.pointsAwarded === 0, 'The eliminated participant received round points.');
+''',
+              'eliminated scoring assertion')
+          live_path.write_text(live)
+          PY
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate changes
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+
+      - name: Commit audited fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/demo/AkteMidasApp.tsx lib/meta/useMetaGame.ts scripts/verify-akte-midas-live.cjs
+          git commit -m "Slow intro and harden game stability"
+          git push origin agent/intro-stability-audit
