@@ -18,6 +18,7 @@ describe("Akte Midas visual and logic audit", () => {
   it("guides the host and blocks incompatible catalog choices", () => {
     const app = source("app/demo/AkteMidasApp.tsx");
     expect(app).toContain("const nextStep");
+    expect(app).toContain("const availableParticipants");
     expect(app).toContain("entry.minPlayers > availableCount");
     expect(app).toContain("!packageCompatible");
     expect(app).toContain("!round.winningTeam");
@@ -28,6 +29,7 @@ describe("Akte Midas visual and logic audit", () => {
     expect(app).toContain("round.number, round.effectSelection?.voterId, round.effectSelection?.targetId");
     expect(app).toContain("member.activeFromRound <= view.currentRound");
     expect(app).toContain("const validVoteTarget");
+    expect(app).toContain("const validVoter");
     expect(app).toContain("disabled={!selectionComplete}");
   });
 
@@ -45,6 +47,7 @@ describe("Akte Midas visual and logic audit", () => {
     expect(css).toContain(".notificationDrawer{position:fixed;left:8px;right:8px");
     expect(css).toContain("@media(pointer:coarse)");
     expect(css).toContain(":focus-visible");
+    expect(css).toContain(".nextStep{grid-column:1/-1");
   });
 
   it("enforces player counts and irreversible elimination on the server", () => {
