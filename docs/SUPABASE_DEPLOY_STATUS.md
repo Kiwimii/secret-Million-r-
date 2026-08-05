@@ -1,8 +1,8 @@
 # Supabase-Datenbank-Deployment
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-08-05T01:06:29Z
-- Commit: 66b65975dcc015915cf448f7526fcf4b738cae3d
+- Zeitpunkt (UTC): 2026-08-05T05:16:08Z
+- Commit: 23be38da54bb2a668a795723c520ff3f13e60765
 - Secrets geprüft: success
 - Projektverknüpfung: success
 - Migrationsvorschau: success
@@ -18,16 +18,16 @@ DRY RUN: migrations will *not* be pushed to the database.
 Using database password *** env var...
 Connecting to remote database...
 Would push these migrations:
- • [1m20260805011100_meta_game_v2_akte_midas_catalogs.sql[22m
+ • [1m20260805011200_meta_game_v2_stability_hardening.sql[22m
 Finished [36msupabase db push[39m.
 --- supabase-apply.log ---
 NotFound: FileSystem.readFile (/home/runner/.supabase/profile)
 Using database password *** env var...
 Connecting to remote database...
 Do you want to push these migrations to the remote database?
- • [1m20260805011100_meta_game_v2_akte_midas_catalogs.sql[22m
+ • [1m20260805011200_meta_game_v2_stability_hardening.sql[22m
  [Y/n] 
-Applying migration 20260805011100_meta_game_v2_akte_midas_catalogs.sql...
+Applying migration 20260805011200_meta_game_v2_stability_hardening.sql...
 v1.74.2: Pulling from supabase/edge-runtime
 b9136609bef0: Pulling fs layer
 bfab333b5e81: Pulling fs layer
