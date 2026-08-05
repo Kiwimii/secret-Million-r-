@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AkteMidasApp from "./AkteMidasApp";
+import AkteMidasExperience from "./AkteMidasExperience";
 
 export const metadata: Metadata = {
   title: "Secret Millionär – Akte Midas",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DemoPage() {
-  return <AkteMidasApp />;
+  return <AkteMidasExperience />;
 }
