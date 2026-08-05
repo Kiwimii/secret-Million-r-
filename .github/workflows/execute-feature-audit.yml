@@ -1,16 +1,16 @@
 name: Execute feature audit
 
 on:
-  pull_request_target:
+  push:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/audit-main-trigger"
 
 permissions:
   contents: write
 
 jobs:
   execute:
-    if: github.event.pull_request.head.ref == 'agent/intro-stability-audit' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
