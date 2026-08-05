@@ -41,6 +41,11 @@ jobs:
           else
             echo "followup=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ -f .github/visual-logic-hotfix.request && -f scripts/apply-visual-logic-hotfix.py ]]; then
+            echo "hotfix=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hotfix=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v4
         if: steps.request.outputs.apply == 'true' || steps.request.outputs.followup == 'true'
@@ -56,6 +61,10 @@ jobs:
       - name: Apply final follow-up
         if: steps.request.outputs.followup == 'true'
         run: python scripts/apply-visual-logic-followup.py
+
+      - name: Apply final hotfix
+        if: steps.request.outputs.hotfix == 'true'
+        run: python scripts/apply-visual-logic-hotfix.py
 
       - name: Install dependencies
         if: steps.request.outputs.apply == 'true' || steps.request.outputs.followup == 'true'
@@ -79,7 +88,7 @@ jobs:
           rm -f .github/visual-logic-cleanup.request
 
       - name: Commit branch changes
-        if: steps.request.outputs.apply == 'true' || steps.request.outputs.cleanup == 'true' || steps.request.outputs.followup == 'true'
+        if: steps.request.outputs.apply == 'true' || steps.request.outputs.cleanup == 'true' || steps.request.outputs.followup == 'true' || steps.request.outputs.hotfix == 'true'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
