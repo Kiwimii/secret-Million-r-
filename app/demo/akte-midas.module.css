@@ -206,3 +206,24 @@
 @media(max-width:980px){.hostGrid{grid-template-columns:1fr}.topbar{align-items:flex-start}.topbarMeta{flex-wrap:wrap;justify-content:flex-end}.controlFlow{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}.catalogGrid{grid-template-columns:1fr}.hostMemberRow{grid-template-columns:auto 1fr}.hostMemberRow select{grid-column:2}.factStrip{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.entry,.intro{padding:10px}.entryPanel{padding:20px}.entryBrand{display:grid;gap:8px}.entry h1{font-size:50px}.modeTabs{grid-template-columns:1fr}.twoColumns,.teamGrid,.missionPanel dl,.effectGrid{grid-template-columns:1fr}.topbar{position:relative;display:grid;padding:12px}.topbarMeta{justify-content:flex-start}.topbarMeta>div:not(.bellWrap){display:none}.anchorNav{padding:0 10px}.hostHero,.playerHero{display:grid;padding:28px 14px 18px}.codeBox,.personalScore{min-width:0;width:100%}.hostGrid,.playerGrid{padding:0 10px 36px}.card{padding:16px}.cardHeader{display:grid}.metrics,.factStrip{grid-template-columns:1fr}.catalogControls{grid-template-columns:1fr}.controlFlow{grid-template-columns:1fr}.historyTable>div{grid-template-columns:1fr 1fr}.leaderboard>div{grid-template-columns:34px 1fr}.leaderboard strong,.leaderboard small{grid-column:2}.overlay{padding:7px}.overlayPanel{padding:20px 15px}.overlayPanel>h2{font-size:31px;padding-right:30px}.introContent{padding:15px 3px}.classifiedStamp{position:static;transform:rotate(-4deg)}}
 @media(prefers-reduced-motion:reduce){.entry *,.entry *:before,.entry *:after,.intro *,.intro *:before,.intro *:after,.app *,.app *:before,.app *:after,.loading *,.loading *:before,.loading *:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* visual-logic-audit */
+.nextStep{margin-top:12px;padding:12px 14px;border:1px solid rgba(196,161,90,.34);background:rgba(196,161,90,.07);display:grid;gap:4px}
+.nextStep span{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:#c4a15a}
+.nextStep strong{font-size:13px;color:#ded7ca;line-height:1.45}
+.capacityWarning,.invalidHint{margin:0 0 14px;padding:11px 13px;background:#2b1810;border:1px solid #76502c;color:#e7c69f;line-height:1.5;font-size:12px}
+.invalidHint{margin:0;background:#281317;border-color:#713039;color:#e5b8bd}
+.memberStatusControl{display:grid;gap:5px;min-width:0}
+.memberStatusControl>span{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#7f847e}
+.tallyAdjustment{display:block;margin-top:3px;color:#d4b96f;font-size:9px;font-weight:700}
+.ineligibleRank{opacity:.55}
+.ineligibleRank b,.ineligibleRank strong{color:#8f938d}
+.app button:focus-visible,.entry button:focus-visible,.intro button:focus-visible,.app a:focus-visible,.app input:focus-visible,.app select:focus-visible,.app textarea:focus-visible,.entry input:focus-visible,.entry select:focus-visible{outline:2px solid #e1c47e;outline-offset:3px}
+.primaryButton:disabled,.controlFlow button:disabled,.dangerButton:disabled,.inlineActions button:disabled,.roleDecision button:disabled,.participantCard button:disabled,.effectSelection button:disabled,.catalogControls>button:disabled,.ghostButton:disabled{opacity:.32;cursor:not-allowed;filter:none}
+.introProgress button{height:28px;background:linear-gradient(transparent 12px,#343532 12px 15px,transparent 15px)}
+.introProgress .activeProgress{background:linear-gradient(transparent 12px,#c4a15a 12px 15px,transparent 15px)}
+.introContent>small,.loading small,.eventList small,.notification span,.notification small{color:#8b9089}
+.card,.overlayPanel,.entryPanel,.notificationDrawer{overflow-wrap:anywhere}
+@media(max-width:980px){.hostMemberRow{grid-template-columns:auto minmax(0,1fr)}.memberStatusControl{grid-column:2}}
+@media(max-width:640px){.topbar{position:sticky;top:0}.notificationDrawer{position:fixed;left:8px;right:8px;top:72px;width:auto;max-height:calc(100vh - 84px)}.anchorNav{scrollbar-width:none}.anchorNav::-webkit-scrollbar{display:none}.hostMemberRow{grid-template-columns:auto minmax(0,1fr)}.memberStatusControl{grid-column:1/-1}.introProgress{width:100%;justify-content:center}.introProgress button{flex:1;max-width:52px}.tally div{grid-template-columns:minmax(90px,1fr) minmax(60px,2fr) 28px}}
+@media(pointer:coarse){.primaryButton,.ghostButton,.controlFlow button,.inlineActions button,.roleDecision button,.participantCard button,.effectSelection button,.codeBox button,.catalogControls>button,.modeTabs button,.anchorNav a{min-height:44px}}

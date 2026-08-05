@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMetaGame } from "@/lib/meta/useMetaGame";
 import {
   BONUS_CATALOG,
@@ -108,18 +108,19 @@ function toneEvent(event: MetaEvent): MetaEvent {
 }
 
 function MidasMark({ compact = false }: { compact?: boolean }) {
+  const gradientId = useId().replace(/:/g, "");
   return (
     <svg className={compact ? styles.markCompact : styles.mark} viewBox="0 0 120 120" aria-hidden="true">
       <defs>
-        <linearGradient id="midasGold" x1="0" x2="1" y1="0" y2="1">
+        <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="1">
           <stop offset="0" stopColor="#f0d28a" />
           <stop offset=".45" stopColor="#b98d3f" />
           <stop offset="1" stopColor="#6f4d1d" />
         </linearGradient>
       </defs>
-      <circle cx="60" cy="60" r="52" fill="none" stroke="url(#midasGold)" strokeWidth="1.5" />
+      <circle cx="60" cy="60" r="52" fill="none" stroke={`url(#${gradientId})`} strokeWidth="1.5" />
       <circle cx="60" cy="60" r="43" fill="none" stroke="currentColor" strokeOpacity=".35" />
-      <path d="M34 77V42l26 23 26-23v35" fill="none" stroke="url(#midasGold)" strokeWidth="5" strokeLinecap="square" />
+      <path d="M34 77V42l26 23 26-23v35" fill="none" stroke={`url(#${gradientId})`} strokeWidth="5" strokeLinecap="square" />
       <path d="M34 82h52M42 32h36" stroke="currentColor" strokeOpacity=".55" />
       <text x="60" y="103" textAnchor="middle" fontSize="8" letterSpacing="3" fill="currentColor">MIDAS</text>
     </svg>
@@ -127,18 +128,19 @@ function MidasMark({ compact = false }: { compact?: boolean }) {
 }
 
 function OperativeSilhouettes() {
+  const gradientId = useId().replace(/:/g, "");
   return (
     <svg className={styles.silhouettes} viewBox="0 0 760 220" aria-hidden="true">
       <defs>
-        <linearGradient id="fadeAgents" x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor="#d2b16a" stopOpacity=".44" />
           <stop offset="1" stopColor="#101213" stopOpacity=".06" />
         </linearGradient>
       </defs>
       {[80, 200, 320, 440, 560, 680].map((x, index) => (
         <g key={x} opacity={index === 2 ? .85 : .48}>
-          <circle cx={x} cy="62" r={index === 2 ? 29 : 25} fill="url(#fadeAgents)" />
-          <path d={`M${x - 48} 202c5-68 20-102 48-102s43 34 48 102z`} fill="url(#fadeAgents)" />
+          <circle cx={x} cy="62" r={index === 2 ? 29 : 25} fill={`url(#${gradientId})`} />
+          <path d={`M${x - 48} 202c5-68 20-102 48-102s43 34 48 102z`} fill={`url(#${gradientId})`} />
           <path d={`M${x - 22} 105l22 25 22-25`} fill="none" stroke="#d2b16a" strokeOpacity=".35" />
         </g>
       ))}
@@ -173,6 +175,18 @@ function Overlay({ classification = "VERTRAULICH", title, children, onClose, dra
   onClose(): void;
   dramatic?: boolean;
 }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
   return (
     <div className={`${styles.overlay} ${dramatic ? styles.dramatic : ""}`} role="dialog" aria-modal="true">
       <div className={styles.overlayPanel}>
@@ -337,13 +351,13 @@ function DashboardShell({ view, controller, children }: { view: MetaGameView; co
         <div className={styles.topbarMeta}>
           <div><small>Einsatzphase</small><strong>{view.currentRound}/{view.totalRounds}</strong></div><div><small>Lage</small><strong>{PHASE_LABELS[view.phase]}</strong></div>
           <NotificationBell events={view.notifications} open={bellOpen} onToggle={() => setBellOpen(!bellOpen)} onRead={() => void controller.markNotificationsRead()} />
-          <button className={styles.ghostButton} onClick={() => void controller.clearSession()}>Akte verlassen</button>
+          <button className={styles.ghostButton} onClick={() => { if (window.confirm("Diese Akte auf diesem Gerät verlassen? Mit Zugangscode, Name und PIN kannst du dein Profil wieder öffnen.")) void controller.clearSession(); }}>Akte verlassen</button>
         </div>
       </header>
       {controller.error && <div className={styles.errorBar}><span>{controller.error}</span><button onClick={() => void controller.refresh()}>Verbindung neu prüfen</button></div>}
       <nav className={styles.anchorNav}><a href="#overview">Lagebild</a><a href="#players">Kartei</a><a href="#role">Deckung</a><a href="#mission">Auftrag</a><a href="#challenge">Feldoperation</a><a href="#vote">Verdacht</a><a href="#log">Einsatzakte</a></nav>
       {children}
-      {popup && <Overlay classification="NEUE MELDUNG" title={popup.title} onClose={() => setDismissed([...dismissed, popup.id])}><p>{popup.body}</p><small>Die Meldung bleibt im Nachrichtenarchiv abrufbar. Die Zentrale löscht nur selten Beweise.</small></Overlay>}
+      {popup && <Overlay classification="NEUE MELDUNG" title={popup.title} onClose={() => setDismissed((current) => current.includes(popup.id) ? current : [...current, popup.id])}><p>{popup.body}</p><small>Die Meldung bleibt im Nachrichtenarchiv abrufbar. Die Zentrale löscht nur selten Beweise.</small></Overlay>}
     </main>
   );
 }
@@ -369,6 +383,8 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
   const [revealOpen, setRevealOpen] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string>();
+  const [copiedCode, setCopiedCode] = useState(false);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     setMissionId(round.mission?.catalogId ?? MISSION_CATALOG.find((entry) => entry.title === round.mission?.title)?.catalogId ?? "M01");
@@ -379,31 +395,76 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
   useEffect(() => { if (view.phase === "reveal_ready" || (round.result && !round.resultPublished)) setRevealOpen(true); }, [view.phase, round.result, round.resultPublished]);
   useEffect(() => { if (view.phase === "finished") setFinalOpen(true); }, [view.phase]);
 
+  const activeCandidates = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound);
+  const activeCount = activeCandidates.length;
+  const compatibleMissions = MISSION_CATALOG.filter((entry) => entry.minPlayers <= activeCount);
+  const compatibleChallenges = CHALLENGE_CATALOG.filter((entry) => entry.minPlayers <= activeCount);
   const mission = missionById(missionId);
   const challenge = challengeById(challengeId);
   const bonus = bonusById(bonusId);
   const malus = malusById(malusId);
+  const packageCompatible = mission.minPlayers <= activeCount && challenge.minPlayers <= activeCount;
   const usedMissionIds = useMemo(() => Object.values(view.rounds ?? {}).map((entry) => entry.mission?.catalogId).filter((id): id is string => Boolean(id)), [view.rounds]);
   const usedChallengeIds = useMemo(() => Object.values(view.rounds ?? {}).map((entry) => entry.challenge?.catalogId).filter((id): id is string => Boolean(id)), [view.rounds]);
 
-  async function run(name: string, action: () => Promise<void>) { setBusyAction(name); try { await action(); } finally { setBusyAction(undefined); } }
+  async function run(name: string, action: () => Promise<void>) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusyAction(name);
+    try { await action(); }
+    finally { busyRef.current = false; setBusyAction(undefined); }
+  }
+  async function copyJoinCode() {
+    try {
+      await navigator.clipboard.writeText(view.joinCode);
+      setCopiedCode(true);
+      window.setTimeout(() => setCopiedCode(false), 1800);
+    } catch {
+      window.prompt("Zugangscode kopieren", view.joinCode);
+    }
+  }
   function packageInput(): RoundPackageInput { return { mission, challenge, bonus, malus }; }
 
-  const activeCandidates = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound);
   const submitted = activeCandidates.filter((member) => member.voteSubmitted).length;
+  const isBusy = Boolean(busyAction);
+  const nextStep = activeCount < 4
+    ? `Mindestens vier aktive Spieler werden benötigt. Aktuell: ${activeCount}.`
+    : !round.mission?.catalogId || !round.challenge?.catalogId
+      ? "Rundenpaket auswählen und versiegeln."
+      : !round.millionaireId
+        ? "Millionär auslosen."
+        : !round.roleReleased
+          ? "Deckungen freigeben."
+          : !round.missionPublished
+            ? "Geheimen Auftrag entsiegeln."
+            : !round.challengePublished
+              ? "Teams und Feldoperation freigeben."
+              : !round.winningTeam
+                ? "Siegerteam der Feldoperation bestätigen."
+                : !["completed", "failed", "neutral"].includes(round.missionStatus ?? "pending")
+                  ? "Mission bewerten."
+                  : view.phase === "voting_open"
+                    ? `Auf Stimmen warten oder Auswertung mit ${submitted}/${activeCount} Stimmen schließen.`
+                    : !round.result
+                      ? "Verdachtsprotokoll öffnen."
+                      : !round.resultPublished
+                        ? "Enthüllung prüfen und Abschlussbericht veröffentlichen."
+                        : view.currentRound === view.totalRounds
+                          ? "Archiv Midas öffnen."
+                          : "Nächste Einsatzphase starten.";
 
   return (
     <DashboardShell view={view} controller={controller}>
-      <div className={styles.hostHero} id="overview"><div><span>LEITSTELLE</span><h2>Einsatzphase {view.currentRound}</h2><p>Sie steuern Freigaben und Ergebnisse. Macht ist kein Ersatz für Übersicht, wird aber häufig damit verwechselt.</p></div><div className={styles.codeBox}><small>Zugangscode</small><strong>{view.joinCode}</strong><button onClick={() => void navigator.clipboard?.writeText(view.joinCode)}>Code kopieren</button></div></div>
+      <div className={styles.hostHero} id="overview"><div><span>LEITSTELLE</span><h2>Einsatzphase {view.currentRound}</h2><p>Sie steuern Freigaben und Ergebnisse. Macht ist kein Ersatz für Übersicht, wird aber häufig damit verwechselt.</p></div><div className={styles.codeBox}><small>Zugangscode</small><strong>{view.joinCode}</strong><button onClick={() => void copyJoinCode()}>{copiedCode ? "Kopiert" : "Code kopieren"}</button></div></div>
       <div className={styles.hostGrid}>
         <div className={styles.mainColumn}>
-          <Card eyebrow="Lagebild" title="Operativer Status" subtitle="Alle entscheidenden Zustände dieser Runde. Die Zentrale vermeidet Überraschungen, soweit Teilnehmer dies zulassen." action={<button className={styles.ghostButton} onClick={() => void run("join", () => controller.setAcceptingPlayers(!view.acceptingPlayers))}>{view.acceptingPlayers ? "Beitritt verriegeln" : "Beitritt öffnen"}</button>}>
-            <div className={styles.metrics}><div><span>Aktive Kandidaten</span><strong>{activeCandidates.length}</strong></div><div><span>Verriegelte Stimmen</span><strong>{submitted}/{activeCandidates.length}</strong></div><div><span>Millionär</span><strong>{round.millionaireId ? getName(view, round.millionaireId) : "Nicht ausgelost"}</strong></div><div><span>Aktenrevision</span><strong>{view.revision}</strong></div></div>
+          <Card eyebrow="Lagebild" title="Operativer Status" subtitle="Alle entscheidenden Zustände dieser Runde. Die Zentrale vermeidet Überraschungen, soweit Teilnehmer dies zulassen." action={<button className={styles.ghostButton} disabled={isBusy} onClick={() => void run("join", () => controller.setAcceptingPlayers(!view.acceptingPlayers))}>{view.acceptingPlayers ? "Beitritt verriegeln" : "Beitritt öffnen"}</button>}>
+            <div className={styles.metrics}><div><span>Aktive Kandidaten</span><strong>{activeCandidates.length}</strong></div><div><span>Verriegelte Stimmen</span><strong>{submitted}/{activeCandidates.length}</strong></div><div><span>Millionär</span><strong>{round.millionaireId ? getName(view, round.millionaireId) : "Nicht ausgelost"}</strong></div><div><span>Aktenrevision</span><strong>{view.revision}</strong></div><div className={styles.nextStep}><span>Nächster Schritt</span><strong>{nextStep}</strong></div></div>
           </Card>
           <Card eyebrow="Versiegelte Auswahl" title="Rundenpaket" subtitle="Mission, Feldoperation, Bonus und Malus sind getrennte, feste Katalogeinträge. Freitext wurde aus guten Gründen aus dem Gebäude begleitet.">
-            <div className={styles.catalogControls}>
-              <label>Geheime Mission<select value={missionId} onChange={(event) => setMissionId(event.target.value)}>{MISSION_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title} · {entry.difficulty}</option>)}</select></label><button onClick={() => setMissionId(randomUnused(MISSION_CATALOG, usedMissionIds).catalogId)}>Ungespielte Mission ziehen</button>
-              <label>Team-Challenge<select value={challengeId} onChange={(event) => setChallengeId(event.target.value)}>{CHALLENGE_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title} · {entry.category}</option>)}</select></label><button onClick={() => setChallengeId(randomUnused(CHALLENGE_CATALOG, usedChallengeIds).catalogId)}>Ungespielte Challenge ziehen</button>
+            {!packageCompatible && <div className={styles.capacityWarning}>Auswahl nicht spielbar: Mission benötigt {mission.minPlayers}, Challenge {challenge.minPlayers}, verfügbar sind {activeCount} aktive Spieler.</div>}<div className={styles.catalogControls}>
+              <label>Geheime Mission<select value={missionId} onChange={(event) => setMissionId(event.target.value)}>{MISSION_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > activeCount}>{entry.catalogId} · {entry.title} · {entry.difficulty} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleMissions.length === 0} onClick={() => setMissionId(randomUnused(compatibleMissions, usedMissionIds).catalogId)}>Passende Mission ziehen</button>
+              <label>Team-Challenge<select value={challengeId} onChange={(event) => setChallengeId(event.target.value)}>{CHALLENGE_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > activeCount}>{entry.catalogId} · {entry.title} · {entry.category} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleChallenges.length === 0} onClick={() => setChallengeId(randomUnused(compatibleChallenges, usedChallengeIds).catalogId)}>Passende Challenge ziehen</button>
               <label>Bonus bei Erfolg<select value={bonusId} onChange={(event) => setBonusId(event.target.value)}>{BONUS_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title}</option>)}</select></label>
               <label>Malus bei Misserfolg<select value={malusId} onChange={(event) => setMalusId(event.target.value)}>{MALUS_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title}</option>)}</select></label>
             </div>
@@ -413,12 +474,12 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
           </Card>
           <Card eyebrow="Befehlskette" title="Zentrale Rundensteuerung" subtitle="Der Ablauf kann jederzeit fortgesetzt werden. Fehlende Reaktionen einzelner Teilnehmer sind Warnungen, keine Geiselnahme.">
             <div className={styles.controlFlow}>
-              <button onClick={() => { const redraw = Boolean(round.millionaireId); if (redraw && !window.confirm("Die bisherige Deckung wird ungültig. Millionär wirklich zufällig neu auslosen?")) return; void run("draw", () => controller.drawMillionaire(redraw)); }} disabled={['voting_open','reveal_ready','report','role_decision','finished'].includes(view.phase)}>{round.millionaireId ? "Notfall-Neuauslosung" : "Millionär auslosen"}</button>
-              <button onClick={() => void run("roles", () => controller.releaseRoles())} disabled={!round.millionaireId || Boolean(round.roleReleased)}>Deckungen freigeben</button><button onClick={() => void run("mission", () => controller.publishMission())} disabled={!round.roleReleased || Boolean(round.missionPublished)}>Auftrag entsiegeln</button><button onClick={() => void run("teams", () => controller.drawTeams())} disabled={!round.missionPublished || Boolean(round.challengePublished)}>Feldoperation freigeben</button><button onClick={() => void run("missionok", () => controller.setMissionStatus("completed"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Auftrag erfüllt</button><button onClick={() => void run("missionfail", () => controller.setMissionStatus("failed"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Auftrag gescheitert</button><button onClick={() => void run("neutral", () => controller.setMissionStatus("neutral"))} disabled={!round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Neutral abschließen</button><button onClick={() => void run("voteopen", () => controller.openVoting())} disabled={!['completed','failed','neutral'].includes(round.missionStatus ?? "pending") || view.phase === "voting_open"}>Verdachtsprotokoll öffnen</button><button className={styles.dangerButton} onClick={() => void run("voteclose", () => controller.closeVoting())} disabled={view.phase !== "voting_open"}>Stimmen verriegeln ({submitted}/{activeCandidates.length})</button><button onClick={() => setRevealOpen(true)} disabled={!round.result}>Enthüllung starten</button><button onClick={() => void run("publish", () => controller.publishResult())} disabled={!round.result || Boolean(round.resultPublished)}>Bericht veröffentlichen</button><button className={styles.primaryButton} onClick={() => void run("next", () => controller.advanceRound())} disabled={!round.resultPublished}>{view.currentRound === view.totalRounds ? "Archiv Midas öffnen" : "Nächste Einsatzphase"}</button>
+              <button onClick={() => { const redraw = Boolean(round.millionaireId); if (redraw && !window.confirm("Die bisherige Deckung wird ungültig. Millionär wirklich zufällig neu auslosen?")) return; void run("draw", () => controller.drawMillionaire(redraw)); }} disabled={isBusy || ['voting_open','reveal_ready','report','role_decision','finished'].includes(view.phase)}>{round.millionaireId ? "Notfall-Neuauslosung" : "Millionär auslosen"}</button>
+              <button onClick={() => void run("roles", () => controller.releaseRoles())} disabled={isBusy || !round.millionaireId || Boolean(round.roleReleased)}>Deckungen freigeben</button><button onClick={() => void run("mission", () => controller.publishMission())} disabled={isBusy || !round.roleReleased || Boolean(round.missionPublished)}>Auftrag entsiegeln</button><button onClick={() => void run("teams", () => controller.drawTeams())} disabled={isBusy || !round.missionPublished || Boolean(round.challengePublished)}>Feldoperation freigeben</button><button onClick={() => void run("missionok", () => controller.setMissionStatus("completed"))} disabled={isBusy || !round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Auftrag erfüllt</button><button onClick={() => void run("missionfail", () => controller.setMissionStatus("failed"))} disabled={isBusy || !round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Auftrag gescheitert</button><button onClick={() => void run("neutral", () => controller.setMissionStatus("neutral"))} disabled={isBusy || !round.challengePublished || !['challenge','mission_review'].includes(view.phase)}>Neutral abschließen</button><button onClick={() => void run("voteopen", () => controller.openVoting())} disabled={isBusy || !round.winningTeam || !['completed','failed','neutral'].includes(round.missionStatus ?? "pending") || view.phase === "voting_open"}>Verdachtsprotokoll öffnen</button><button className={styles.dangerButton} onClick={() => void run("voteclose", () => controller.closeVoting())} disabled={isBusy || view.phase !== "voting_open"}>Stimmen verriegeln ({submitted}/{activeCandidates.length})</button><button onClick={() => setRevealOpen(true)} disabled={isBusy || !round.result}>Enthüllung starten</button><button onClick={() => void run("publish", () => controller.publishResult())} disabled={isBusy || !round.result || Boolean(round.resultPublished)}>Bericht veröffentlichen</button><button className={styles.primaryButton} onClick={() => void run("next", () => controller.advanceRound())} disabled={isBusy || !round.resultPublished}>{view.currentRound === view.totalRounds ? "Archiv Midas öffnen" : "Nächste Einsatzphase"}</button>
             </div><p className={styles.muted}>Fehlende Stimmen verhindern den Abschluss nicht. Sie werden als nicht abgegeben dokumentiert und erhalten keine Punkte. Demokratie kann warten; der Zeitplan nicht.</p>
           </Card>
           <Card id="challenge" eyebrow="Feldoperation" title="Teams und Ergebnis">
-            {!round.challengePublished ? <p className={styles.placeholder}>Die Feldoperation ist noch versiegelt. Freundschaften ebenfalls.</p> : <><h3>{round.challenge?.title}</h3><p>{round.challenge?.briefing}</p><div className={styles.factStrip}><span><b>Sieg</b>{round.challenge?.winCondition}</span><span><b>Material</b>{round.challenge?.material}</span><span><b>Getränkeregel</b>{round.challenge?.drinkRule}</span></div><div className={styles.teamGrid}><TeamPanel team="azur" view={view} round={round} /><TeamPanel team="gold" view={view} round={round} /></div><div className={styles.inlineActions}><button disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner("azur")}>Sektor Azur gewinnt</button><button disabled={!['challenge','mission_review'].includes(view.phase)} onClick={() => void controller.setChallengeWinner("gold")}>Sektor Gold gewinnt</button></div></>}
+            {!round.challengePublished ? <p className={styles.placeholder}>Die Feldoperation ist noch versiegelt. Freundschaften ebenfalls.</p> : <><h3>{round.challenge?.title}</h3><p>{round.challenge?.briefing}</p><div className={styles.factStrip}><span><b>Sieg</b>{round.challenge?.winCondition}</span><span><b>Material</b>{round.challenge?.material}</span><span><b>Getränkeregel</b>{round.challenge?.drinkRule}</span></div><div className={styles.teamGrid}><TeamPanel team="azur" view={view} round={round} /><TeamPanel team="gold" view={view} round={round} /></div><div className={styles.inlineActions}><button disabled={isBusy || !['challenge','mission_review'].includes(view.phase)} onClick={() => void run("challenge-azur", () => controller.setChallengeWinner("azur"))}>Sektor Azur gewinnt</button><button disabled={isBusy || !['challenge','mission_review'].includes(view.phase)} onClick={() => void run("challenge-gold", () => controller.setChallengeWinner("gold"))}>Sektor Gold gewinnt</button></div></>}
           </Card>
           <Card id="vote" eyebrow="Verdachtsprotokoll" title="Live-Monitor"><div className={styles.voteMonitor}>{activeCandidates.map((member) => <div key={member.id}><span className={styles.avatar}>{member.displayName[0]}</span><div><strong>{member.displayName}</strong><small>{member.voteSubmitted ? "Stimme verriegelt" : "Entscheidung ausstehend"}</small></div><b className={member.voteSubmitted ? styles.ok : styles.wait}>{member.voteSubmitted ? "✓" : "…"}</b></div>)}</div></Card>
         </div>
@@ -428,14 +489,14 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
           <Card id="log" eyebrow="Leitstellenarchiv" title="Ereignisprotokoll"><EventList events={view.notifications} /></Card>
         </aside>
       </div>
-      {revealOpen && round.result && <RevealOverlay view={view} round={round} onClose={() => setRevealOpen(false)} onPublish={!round.resultPublished ? () => void controller.publishResult() : undefined} />}
+      {revealOpen && round.result && <RevealOverlay view={view} round={round} onClose={() => setRevealOpen(false)} onPublish={!round.resultPublished ? () => void run("publish-overlay", () => controller.publishResult()) : undefined} />}
       {finalOpen && view.finalResult && <FinalOverlay view={view} onClose={() => setFinalOpen(false)} />}
     </DashboardShell>
   );
 }
 
 function HostMemberRow({ member, controller }: { member: MetaMember; controller: ReturnType<typeof useMetaGame> }) {
-  return <div className={styles.hostMemberRow}><span className={styles.avatar}>{member.displayName[0]}</span><div><strong>{member.displayName}</strong><small>{memberStatus(member)} · aktiv ab R{member.activeFromRound} · {member.points ?? 0} Punkte</small></div><select value={member.attendanceStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, attendanceStatus: event.target.value as MetaMember["attendanceStatus"] })}><option value="present">Anwesend</option><option value="temporarily_absent">Abwesend</option><option value="departed">Abgereist</option></select><select value={member.competitionStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, competitionStatus: event.target.value as MetaMember["competitionStatus"] })}><option value="eligible">Aktiv</option><option value="eliminated">Aus der Wertung</option><option value="disqualified">Disqualifiziert</option></select></div>;
+  return <div className={styles.hostMemberRow}><span className={styles.avatar}>{member.displayName[0]}</span><div><strong>{member.displayName}</strong><small>{memberStatus(member)} · aktiv ab R{member.activeFromRound} · {member.points ?? 0} Punkte</small></div><label className={styles.memberStatusControl}><span>Anwesenheit</span><select value={member.attendanceStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, attendanceStatus: event.target.value as MetaMember["attendanceStatus"] })}><option value="present">Anwesend</option><option value="temporarily_absent">Vorübergehend abwesend</option><option value="departed">Abgereist</option></select></label><label className={styles.memberStatusControl}><span>Wertung</span><select value={member.competitionStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, competitionStatus: event.target.value as MetaMember["competitionStatus"] })}>{member.competitionStatus === "eligible" && <option value="eligible">Aktiv</option>}{member.competitionStatus !== "disqualified" && <option value="eliminated">Aus der Wertung</option>}<option value="disqualified">Disqualifiziert</option></select></label></div>;
 }
 
 function TeamPanel({ team, view, round }: { team: TeamCode; view: MetaGameView; round: MetaRoundState }) {
@@ -456,25 +517,37 @@ function ParticipantNotes({ view, controller }: { view: MetaGameView; controller
 
 function EffectSelection({ view, round, controller }: { view: MetaGameView; round: MetaRoundState; controller: ReturnType<typeof useMetaGame> }) {
   const effect = round.missionStatus === "completed" ? round.bonus : round.missionStatus === "failed" ? round.malus : undefined;
-  const [voterId,setVoterId] = useState(round.effectSelection?.voterId ?? "");
-  const [targetId,setTargetId] = useState(round.effectSelection?.targetId ?? "");
+  const [voterId, setVoterId] = useState(round.effectSelection?.voterId ?? "");
+  const [targetId, setTargetId] = useState(round.effectSelection?.targetId ?? "");
+  useEffect(() => {
+    setVoterId(round.effectSelection?.voterId ?? "");
+    setTargetId(round.effectSelection?.targetId ?? "");
+  }, [round.number, round.effectSelection?.voterId, round.effectSelection?.targetId]);
   if (!effect || effect.kind === "none" || effect.selectionMode === "none") return null;
-  const selectable = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.id !== view.memberId);
-  return <div className={styles.effectSelection}><h4>Effektziel festlegen: {effect.title}</h4>{["voter","source_and_target"].includes(effect.selectionMode ?? "") && <label>Betroffener Wähler<select value={voterId} onChange={(event) => setVoterId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}{["target","source_and_target"].includes(effect.selectionMode ?? "") && <label>Zielperson<select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}<button onClick={() => void controller.setEffectSelection({ voterId, targetId })}>Auswahl verriegeln</button></div>;
+  const selectable = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound && member.id !== view.memberId);
+  const requiresVoter = ["voter", "source_and_target"].includes(effect.selectionMode ?? "");
+  const requiresTarget = ["target", "source_and_target"].includes(effect.selectionMode ?? "");
+  const selectionComplete = (!requiresVoter || Boolean(voterId)) && (!requiresTarget || Boolean(targetId));
+  return <div className={styles.effectSelection}><h4>Effektziel festlegen: {effect.title}</h4>{requiresVoter && <label>Betroffener Wähler<select value={voterId} onChange={(event) => setVoterId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}{requiresTarget && <label>Zielperson<select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}<button disabled={!selectionComplete} onClick={() => void controller.setEffectSelection({ voterId, targetId })}>Auswahl verriegeln</button>{!selectionComplete && <small className={styles.invalidHint}>Der Effekt verfällt ohne vollständige Auswahl.</small>}</div>;
 }
 
 function PlayerDashboard({ view, controller }: { view: MetaGameView; controller: ReturnType<typeof useMetaGame> }) {
   const round = view.currentRoundState;
   const currentMember = view.members.find((member) => member.id === view.memberId);
   const candidates = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound && member.id !== view.memberId);
+  const candidateKey = candidates.map((member) => member.id).join("|");
   const [voteTarget,setVoteTarget] = useState(view.ownVoteDraft ?? "");
   const [revealOpen,setRevealOpen] = useState(false);
   const [finalOpen,setFinalOpen] = useState(false);
-  useEffect(() => setVoteTarget(view.ownVoteDraft ?? ""), [view.ownVoteDraft, view.currentRound]);
+  useEffect(() => {
+    const draft = view.ownVoteDraft ?? "";
+    setVoteTarget(draft && candidates.some((member) => member.id === draft) ? draft : "");
+  }, [view.ownVoteDraft, view.currentRound, candidateKey]);
   useEffect(() => { if (round.resultPublished) setRevealOpen(true); }, [round.resultPublished, view.currentRound]);
   useEffect(() => { if (view.phase === "finished") setFinalOpen(true); }, [view.phase]);
   const canVote = currentMember?.attendanceStatus === "present" && currentMember.competitionStatus === "eligible" && currentMember.activeFromRound <= view.currentRound;
   const ownTeam = round.teams?.[view.memberId ?? ""];
+  const validVoteTarget = candidates.some((member) => member.id === voteTarget);
 
   return <DashboardShell view={view} controller={controller}>
     <div className={styles.playerHero} id="overview"><div><span>PERSÖNLICHE AKTE</span><h2>Einsatzphase {view.currentRound}</h2><p>Alle freigegebenen Informationen bleiben erreichbar. Vergesslichkeit ist damit keine belastbare Verteidigung mehr.</p></div><div className={styles.personalScore}><small>Geheime Punkte</small><strong>{view.ownPoints ?? 0}</strong><span>{memberStatus(currentMember)}</span></div></div>
@@ -484,7 +557,7 @@ function PlayerDashboard({ view, controller }: { view: MetaGameView; controller:
       <Card id="role" eyebrow="Ihre Deckung" title="Eigene Rolle">{!round.roleReleased ? <p className={styles.placeholder}>Ihre Akte ist noch versiegelt. Die Leitstelle sortiert derzeit Verantwortung, Schuld und Zufall.</p> : view.ownRole === "millionaire" ? <div className={`${styles.secretRole} ${styles.millionaireRole}`}><MidasMark /><h3>Sie sind der Millionär</h3><p>Sie besitzen die Rolle, nicht die Immunität. Erfüllen Sie den Auftrag und vermeiden Sie es, bei der Abstimmung die beliebteste Person im Raum zu werden.</p></div> : view.ownRole === "investigator" ? <div className={styles.secretRole}><div className={styles.scopeGraphic}><span /><span /><span /></div><h3>Sie sind Ermittler</h3><p>Beobachten Sie Verhalten, Widersprüche und auffällige Versuche, unauffällig zu wirken. Selbstbewusstsein ist kein Beweis für Vermögen.</p></div> : <p className={styles.placeholder}>Sie sind in dieser Runde nicht wettbewerbsberechtigt. Gesellschaftlich bleiben Sie leider vollständig verfügbar.</p>}</Card>
       <Card id="mission" eyebrow="Versiegelter Auftrag" title={view.ownRole === "millionaire" ? (round.mission?.title ?? "Wird vorbereitet") : "Nur für den Millionär"}>{view.ownRole !== "millionaire" ? <p className={styles.placeholder}>Der Millionär hat einen geheimen Auftrag. Sie erhalten keine weiteren Informationen. Das unangenehme Gefühl, etwas zu übersehen, ist Bestandteil des Spiels.</p> : !round.missionPublished ? <p className={styles.placeholder}>Ihr Auftrag wird vorbereitet. Versuchen Sie bis dahin, nicht vorsorglich verdächtig zu werden.</p> : <div className={styles.missionPanel}><div className={styles.classificationLine}><span>{round.mission?.catalogId ?? "MISSION"}</span><b>{round.mission?.difficulty ?? "klassifiziert"}</b></div><p>{round.mission?.task}</p><dl><div><dt>Erfolgskriterium</dt><dd>{round.mission?.successCriteria}</dd></div><div><dt>Zeitfenster</dt><dd>{round.mission?.timeWindow}</dd></div><div><dt>Voraussetzung</dt><dd>{round.mission?.requirements}</dd></div><div><dt>Einschränkung</dt><dd>{round.mission?.restriction}</dd></div></dl>{round.mission?.centralNote && <blockquote>{round.mission.centralNote}</blockquote>}<div className={styles.effectGrid}>{round.bonus && <EffectPreview label="Bonus bei Erfolg" effect={round.bonus as EffectCatalogEntry} tone="bonus" />}{round.malus && <EffectPreview label="Malus bei Misserfolg" effect={round.malus as EffectCatalogEntry} tone="malus" />}</div><div className={styles.statusLine}>Status: <strong>{round.missionStatus === "completed" ? "Auftrag erfüllt" : round.missionStatus === "failed" ? "Auftrag gescheitert" : round.missionStatus === "neutral" ? "Neutral beendet" : "Aktiv"}</strong></div><EffectSelection view={view} round={round} controller={controller} /></div>}</Card>
       <Card id="challenge" eyebrow="Feldoperation" title={round.challengePublished ? (round.challenge?.title ?? "Challenge") : "Wird vorbereitet"}>{!round.challengePublished ? <p className={styles.placeholder}>Die Feldoperation wird vorbereitet. Teams sind noch nicht endgültig. Freundschaften ebenfalls nicht.</p> : <><p>{round.challenge?.briefing}</p><div className={styles.factStrip}><span><b>Ihr Sektor</b>{ownTeam ? `Sektor ${ownTeam === "azur" ? "Azur" : "Gold"}` : "Noch nicht zugewiesen"}</span><span><b>Siegbedingung</b>{round.challenge?.winCondition}</span><span><b>Dauer</b>{round.challenge?.duration}</span><span><b>Material</b>{round.challenge?.material}</span><span><b>Sicherheit</b>{round.challenge?.safety}</span><span><b>Getränkeregel</b>{round.challenge?.drinkRule}</span></div>{round.challenge?.centralNote && <blockquote>{round.challenge.centralNote}</blockquote>}<div className={styles.teamGrid}><TeamPanel team="azur" view={view} round={round} /><TeamPanel team="gold" view={view} round={round} /></div>{round.winningTeam && <div className={styles.winnerStrip}>Sektor {round.winningTeam === "azur" ? "Azur" : "Gold"} gewinnt. Die Zentrale ist beeindruckt. Dieser Zustand ist vorübergehend.</div>}</>}</Card>
-      <Card id="vote" eyebrow="Verdachtsprotokoll" title="Abstimmung">{!canVote ? <p className={styles.placeholder}>Sie sind in dieser Runde nicht abstimmungsberechtigt. Eine Meinung dürfen Sie selbstverständlich weiterhin besitzen.</p> : <div className={styles.voteCard}><label>Wen halten Sie für den Millionär?<select value={voteTarget} disabled={Boolean(view.ownVote)} onChange={(event) => { setVoteTarget(event.target.value); if (event.target.value) void controller.saveVoteDraft(event.target.value); }}><option value="">Verdacht vormerken</option>{candidates.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label><p>{view.phase === "voting_open" ? "Das Verdachtsprotokoll ist geöffnet. Prüfen Sie Ihren Entwurf und verriegeln Sie die Stimme." : "Diese Auswahl ist ein privater Entwurf und kann geändert werden. Sie entspricht damit dem normalen Zustand einer starken Meinung."}</p>{view.ownVote ? <div className={styles.lockedVote}>STIMME VERRIEGELT · {getName(view,view.ownVote)}<small>Reue bleibt verfügbar. Änderungen nicht.</small></div> : <button className={styles.primaryButton} disabled={view.phase !== "voting_open" || !voteTarget} onClick={() => void controller.submitVote(voteTarget)}>Stimme verriegeln</button>}</div>}</Card>
+      <Card id="vote" eyebrow="Verdachtsprotokoll" title="Abstimmung">{!canVote ? <p className={styles.placeholder}>Sie sind in dieser Runde nicht abstimmungsberechtigt. Eine Meinung dürfen Sie selbstverständlich weiterhin besitzen.</p> : <div className={styles.voteCard}><label>Wen halten Sie für den Millionär?<select value={voteTarget} disabled={Boolean(view.ownVote)} onChange={(event) => { setVoteTarget(event.target.value); if (event.target.value) void controller.saveVoteDraft(event.target.value); }}><option value="">Verdacht vormerken</option>{candidates.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label><p>{view.phase === "voting_open" ? "Das Verdachtsprotokoll ist geöffnet. Prüfen Sie Ihren Entwurf und verriegeln Sie die Stimme." : "Diese Auswahl ist ein privater Entwurf und kann geändert werden. Sie entspricht damit dem normalen Zustand einer starken Meinung."}</p>{voteTarget && !validVoteTarget && <div className={styles.invalidHint}>Dieses Profil ist nicht mehr abstimmungsberechtigt. Bitte wähle neu.</div>}{view.ownVote ? <div className={styles.lockedVote}>STIMME VERRIEGELT · {getName(view,view.ownVote)}<small>Reue bleibt verfügbar. Änderungen nicht.</small></div> : <button className={styles.primaryButton} disabled={view.phase !== "voting_open" || !validVoteTarget} onClick={() => void controller.submitVote(voteTarget)}>Stimme verriegeln</button>}</div>}</Card>
       {view.ownRole === "millionaire" && round.resultPublished && round.result?.millionaireSurvived && view.currentRound < view.totalRounds && <Card eyebrow="Nächste Deckung" title="Rolle behalten?"><p>Sie wurden nicht enttarnt. Das kann Kompetenz gewesen sein. Die Zentrale vermeidet vorschnelle Schlussfolgerungen.</p><div className={styles.roleDecision}><button onClick={() => void controller.submitRoleDecision("keep")}>Deckung behalten</button><button onClick={() => void controller.submitRoleDecision("transfer")}>Zufällig weitergeben</button></div></Card>}
       <Card id="log" eyebrow="Einsatzakte" title="Persönliches Protokoll"><EventList events={view.notifications} />{(view.personalHistory ?? []).length > 0 && <div className={styles.historyTable}>{view.personalHistory?.map((entry) => <div key={entry.roundNumber}><b>Runde {entry.roundNumber}</b><span>{entry.role === "millionaire" ? "Millionär" : entry.role === "investigator" ? "Ermittler" : "Außer Wertung"}</span><span>{entry.voteTargetId ? `Stimme: ${getName(view,entry.voteTargetId)}` : "Keine Stimme"}</span><strong>{entry.pointsAwarded >= 0 ? "+" : ""}{entry.pointsAwarded} Punkte</strong></div>)}</div>}</Card>
     </div>
@@ -494,15 +567,25 @@ function PlayerDashboard({ view, controller }: { view: MetaGameView; controller:
 
 function RevealOverlay({ view, round, onClose, onPublish }: { view: MetaGameView; round: MetaRoundState; onClose(): void; onPublish?: () => void }) {
   const result = round.result!;
-  const [step,setStep] = useState(0);
-  useEffect(() => { const timer = window.setInterval(() => setStep((current) => Math.min(5,current+1)),1250); return () => window.clearInterval(timer); },[]);
+  const [step, setStep] = useState(0);
   const lines = ["Die Stimmen sind verriegelt.",result.effect?.kind && result.effect.kind !== "none" ? `Missionsfolge aktiv: ${result.effect.title}` : "Keine Missionsfolge verändert die Stimmen.",result.tieResolvedBy === "lot" ? "Gleichstand. Das Los übernimmt die Verantwortung." : "Das Ergebnis ist eindeutig. Unangenehm, aber eindeutig.",`${getName(view,result.eliminatedId)} erhält die meisten wirksamen Stimmen.`,result.millionaireSurvived ? "Der Millionär überlebt die Runde." : "Der Millionär wurde enttarnt.",result.millionaireSurvived ? `${getName(view,result.millionaireId)} bleibt als Millionär im Spiel.` : `${getName(view,result.millionaireId)} war der Millionär.`];
-  return <Overlay classification={`AUSWERTUNG · RUNDE ${view.currentRound}`} title="Die Stimmen werden geöffnet" onClose={onClose} dramatic><div className={styles.revealSequence}>{lines.map((line,index) => <div key={line} className={step >= index ? styles.revealed : ""}><span>0{index+1}</span><p>{line}</p></div>)}</div><div className={styles.tally}>{result.effectiveTally.map((entry) => <div key={entry.memberId}><span>{getName(view,entry.memberId)}</span><i style={{ "--votes": Math.max(1,entry.effectiveVotes) } as React.CSSProperties} /><b>{entry.effectiveVotes}</b></div>)}</div><p className={styles.darkJoke}>Die Zentrale gratuliert allen korrekten Entscheidungen. Die übrigen wurden ebenfalls gespeichert.</p>{onPublish && <button className={styles.primaryButton} onClick={onPublish}>Abschlussbericht freigeben</button>}</Overlay>;
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || step >= lines.length - 1) return;
+    const timer = window.setTimeout(() => setStep((current) => Math.min(lines.length - 1, current + 1)), 1750);
+    return () => window.clearTimeout(timer);
+  }, [step, lines.length]);
+  const sortedTally = [...result.effectiveTally].sort((left, right) => right.effectiveVotes - left.effectiveVotes || getName(view,left.memberId).localeCompare(getName(view,right.memberId), "de"));
+  return <Overlay classification={`AUSWERTUNG · RUNDE ${view.currentRound}`} title="Die Stimmen werden geöffnet" onClose={onClose} dramatic><div className={styles.revealSequence}>{lines.map((line,index) => <div key={line} className={step >= index ? styles.revealed : ""}><span>0{index+1}</span><p>{line}</p></div>)}</div>{step < lines.length - 1 && <button className={styles.ghostButton} onClick={() => setStep(lines.length - 1)}>Auswertung sofort anzeigen</button>}<div className={styles.tally}>{sortedTally.map((entry) => <div key={entry.memberId}><span>{getName(view,entry.memberId)}{entry.adjustment !== 0 && <small className={styles.tallyAdjustment}>{entry.adjustment > 0 ? ` +${entry.adjustment}` : ` ${entry.adjustment}`} Effekt</small>}</span><i style={{ "--votes": Math.max(0,entry.effectiveVotes) } as React.CSSProperties} /><b>{entry.effectiveVotes}</b></div>)}</div><p className={styles.darkJoke}>Die Zentrale gratuliert allen korrekten Entscheidungen. Die übrigen wurden ebenfalls gespeichert.</p>{onPublish && <button className={styles.primaryButton} onClick={onPublish}>Abschlussbericht freigeben</button>}</Overlay>;
 }
 
 function FinalOverlay({ view, onClose }: { view: MetaGameView; onClose(): void }) {
   const final = view.finalResult!;
-  return <Overlay classification="ARCHIV MIDAS" title="Die Operation ist beendet" onClose={onClose} dramatic><div className={styles.finalWinner}><MidasMark /><span>Gewinnerakte</span><h3>{getName(view,final.winnerId)}</h3><p>{final.reason === "final_millionaire_survived" ? "Der Millionär hat die letzte Einsatzphase überlebt." : "Die Gesamtwertung entscheidet."}</p></div><div className={styles.leaderboard}>{final.leaderboard.map((entry,index) => <div key={entry.memberId}><b>#{index+1}</b><span>{getName(view,entry.memberId)}</span><strong>{entry.points} Punkte</strong><small>{entry.correctGuesses} richtige Verdächtigungen</small></div>)}</div><div className={styles.finalTimeline}>{final.timeline.map((entry) => <article key={entry.roundNumber}><div><span>AKTE R{entry.roundNumber}</span><strong>{entry.roundNumber} Punkte</strong></div><h4>Millionär: {getName(view,entry.millionaireId)}</h4><p><b>Auftrag:</b> {entry.mission?.title ?? "Kein Auftrag"} · {entry.missionStatus === "completed" ? "erfüllt" : entry.missionStatus === "failed" ? "gescheitert" : "neutral"}</p><p><b>Aus der Wertung:</b> {getName(view,entry.eliminatedId)}{entry.winningTeam ? ` · Feldoperation: Sektor ${entry.winningTeam === "azur" ? "Azur" : "Gold"}` : ""}</p><div className={styles.finalVotes}>{entry.votes.length === 0 ? <small>Keine Stimmen abgegeben.</small> : entry.votes.map((vote) => <span key={`${entry.roundNumber}-${vote.voterId}`}>{getName(view,vote.voterId)} → {getName(view,vote.targetId)}</span>)}</div><div className={styles.finalScores}>{entry.scores.map((score) => <span key={`${entry.roundNumber}-${score.memberId}`}>{getName(view,score.memberId)}: {score.pointsAwarded >= 0 ? "+" : ""}{score.pointsAwarded}{score.correctGuess ? " ✓" : ""}</span>)}</div></article>)}</div><p className={styles.finalLine}>Das Vermögen wurde gefunden. Die Würde bleibt vermisst.</p><small>Persönliche Ermittlungsnotizen bleiben privat. Selbst die Zentrale hat Grenzen. Einige davon sind rechtlich bedingt.</small></Overlay>;
+  const ranked = [...final.leaderboard].sort((left, right) => {
+    const leftEligible = view.members.find((member) => member.id === left.memberId)?.competitionStatus === "eligible" ? 1 : 0;
+    const rightEligible = view.members.find((member) => member.id === right.memberId)?.competitionStatus === "eligible" ? 1 : 0;
+    return rightEligible - leftEligible || right.points - left.points || right.correctGuesses - left.correctGuesses;
+  });
+  return <Overlay classification="ARCHIV MIDAS" title="Die Operation ist beendet" onClose={onClose} dramatic><div className={styles.finalWinner}><MidasMark /><span>Gewinnerakte</span><h3>{getName(view,final.winnerId)}</h3><p>{final.reason === "final_millionaire_survived" ? "Der Millionär hat die letzte Einsatzphase überlebt." : "Die Gesamtwertung der verbliebenen Spieler entscheidet."}</p></div><div className={styles.leaderboard}>{ranked.map((entry,index) => { const member = view.members.find((candidate) => candidate.id === entry.memberId); const eligible = member?.competitionStatus === "eligible"; return <div key={entry.memberId} className={!eligible ? styles.ineligibleRank : ""}><b>#{index+1}</b><span>{getName(view,entry.memberId)}</span><strong>{entry.points} Punkte</strong><small>{entry.correctGuesses} richtige Verdächtigungen{!eligible ? " · außer Wertung" : ""}</small></div>; })}</div><div className={styles.finalTimeline}>{final.timeline.map((entry) => <article key={entry.roundNumber}><div><span>AKTE R{entry.roundNumber}</span><strong>{entry.roundNumber} Punkte</strong></div><h4>Millionär: {getName(view,entry.millionaireId)}</h4><p><b>Auftrag:</b> {entry.mission?.title ?? "Kein Auftrag"} · {entry.missionStatus === "completed" ? "erfüllt" : entry.missionStatus === "failed" ? "gescheitert" : "neutral"}</p><p><b>Aus der Wertung:</b> {getName(view,entry.eliminatedId)}{entry.winningTeam ? ` · Feldoperation: Sektor ${entry.winningTeam === "azur" ? "Azur" : "Gold"}` : ""}</p><div className={styles.finalVotes}>{entry.votes.length === 0 ? <small>Keine Stimmen abgegeben.</small> : entry.votes.map((vote) => <span key={`${entry.roundNumber}-${vote.voterId}`}>{getName(view,vote.voterId)} → {getName(view,vote.targetId)}</span>)}</div><div className={styles.finalScores}>{entry.scores.map((score) => <span key={`${entry.roundNumber}-${score.memberId}`}>{getName(view,score.memberId)}: {score.pointsAwarded >= 0 ? "+" : ""}{score.pointsAwarded}{score.correctGuess ? " ✓" : ""}</span>)}</div></article>)}</div><p className={styles.finalLine}>Das Vermögen wurde gefunden. Die Würde bleibt vermisst.</p><small>Persönliche Ermittlungsnotizen bleiben privat. Selbst die Zentrale hat Grenzen. Einige davon sind rechtlich bedingt.</small></Overlay>;
 }
 
 export default function AkteMidasApp() {
@@ -510,11 +593,16 @@ export default function AkteMidasApp() {
   const [introSeen,setIntroSeen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(INTRO_STORAGE_KEY) === "seen");
   const briefingKey = controller.identity ? `secret-millionaer.akte-midas.briefing.${controller.identity.gameId}.${controller.identity.accessRole}` : "";
   const [briefingSeen,setBriefingSeen] = useState(false);
-  useEffect(() => { if (!briefingKey || typeof window === "undefined") return; setBriefingSeen(window.localStorage.getItem(briefingKey) === "seen"); },[briefingKey]);
+  const [briefingReady,setBriefingReady] = useState(false);
+  useEffect(() => {
+    if (!briefingKey || typeof window === "undefined") { setBriefingReady(false); return; }
+    setBriefingSeen(window.localStorage.getItem(briefingKey) === "seen");
+    setBriefingReady(true);
+  },[briefingKey]);
   function closeIntro() { window.localStorage.setItem(INTRO_STORAGE_KEY,"seen"); setIntroSeen(true); }
   function closeBriefing() { if (briefingKey) window.localStorage.setItem(briefingKey,"seen"); setBriefingSeen(true); }
   if (!controller.ready || (controller.loading && !controller.identity)) return <main className={styles.loading}><MidasMark /><p>Sichere Verbindung wird hergestellt …</p><small>Vertrauen weiterhin deaktiviert.</small></main>;
   if (!controller.identity || !controller.view) return introSeen ? <EntryScreen controller={controller} /> : <IntroSequence onClose={closeIntro} />;
   const dashboard = controller.view.isHost ? <HostDashboard view={controller.view} controller={controller} /> : <PlayerDashboard view={controller.view} controller={controller} />;
-  return <>{dashboard}{!briefingSeen && <OperationBriefing isHost={controller.view.isHost} onClose={closeBriefing} />}</>;
+  return <>{dashboard}{briefingReady && !briefingSeen && <OperationBriefing isHost={controller.view.isHost} onClose={closeBriefing} />}</>;
 }
