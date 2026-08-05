@@ -1,5 +1,6 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,6 +28,15 @@ async function rpc(client, name, args = {}) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+async function expectRpcFailure(client, name, args, expectedText) {
+  const result = await client.rpc(name, args);
+  assert(result.error, `${name} unexpectedly succeeded.`);
+  assert(
+    result.error.message.includes(expectedText),
+    `${name} failed for the wrong reason: ${result.error.message}`,
+  );
 }
 
 function packageFor(round) {
@@ -154,6 +164,14 @@ async function run() {
     assert(view.currentRoundState.bonus.catalogId === 'B04', 'Canonical bonus was not stored.');
 
     await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    const initialDraw = await hostView(host, gameId);
+    await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    const duplicateDraw = await hostView(host, gameId);
+    assert(
+      initialDraw.currentRoundState.millionaireId === duplicateDraw.currentRoundState.millionaireId,
+      'A duplicate draw changed the millionaire without confirmation.',
+    );
+
     await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
     const beforeRedraw = await hostView(host, gameId);
     await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: true });
@@ -166,14 +184,26 @@ async function run() {
     await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
     await rpc(host, 'meta_host_publish_mission', { target_game_id: gameId });
     await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
-    await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
     await rpc(host, 'meta_host_set_mission_status', { target_game_id: gameId, mission_result: 'completed' });
+    await expectRpcFailure(
+      host,
+      'meta_host_open_voting',
+      { target_game_id: gameId },
+      'Siegerteam',
+    );
+    await rpc(host, 'meta_host_set_challenge_winner', { target_game_id: gameId, winning_team: 'azur' });
 
     view = await hostView(host, gameId);
     const millionaireOne = view.currentRoundState.millionaireId;
     assert(players.has(millionaireOne), 'Round one millionaire has no player session.');
     const effectTarget = view.members.find((member) => member.id !== millionaireOne && member.competitionStatus === 'eligible');
     assert(effectTarget, 'No effect target available.');
+    await expectRpcFailure(
+      players.get(millionaireOne),
+      'meta_player_set_effect_selection',
+      { target_game_id: gameId, effect_selection: { targetId: randomUUID() } },
+      'Zielperson',
+    );
     await rpc(players.get(millionaireOne), 'meta_player_set_effect_selection', {
       target_game_id: gameId,
       effect_selection: { targetId: effectTarget.id },
@@ -203,7 +233,10 @@ async function run() {
     );
     const missingVoter = roundOneVoters.find((member) => member.id !== millionaireOne);
     assert(missingVoter, 'No non-millionaire missing voter could be selected.');
-    const alternateTarget = roundOneVoters.find((member) => member.id !== millionaireOne);
+    const alternateTarget = roundOneVoters.find((member) => (
+      member.id !== millionaireOne && member.id !== effectTarget.id
+    ));
+    assert(alternateTarget, 'No distinct target available for deterministic round-one tally.');
     for (const voter of roundOneVoters) {
       if (voter.id === missingVoter.id) continue;
       const target = voter.id === millionaireOne ? alternateTarget.id : millionaireOne;
@@ -219,6 +252,7 @@ async function run() {
     assert(roundOneResult?.missingVoterIds?.includes(missingVoter.id), 'Missing vote was not documented.');
     assert(roundOneResult?.effect?.catalogId === 'B04', 'Mission bonus was not applied from the canonical catalog.');
     const eliminatedOne = roundOneResult.eliminatedId;
+    assert(eliminatedOne === millionaireOne, 'Round one did not eliminate the deliberately exposed millionaire.');
 
     await rpc(host, 'meta_host_publish_result', { target_game_id: gameId });
     await rpc(host, 'meta_host_advance_round', { target_game_id: gameId });
@@ -266,6 +300,8 @@ async function run() {
     const missingScore = roundOneArchive?.scores?.find((score) => score.memberId === missingVoter.id);
     assert(missingScore && missingScore.pointsAwarded <= 0, 'A missing voter received positive round points.');
     assert(roundOneArchive?.mission?.catalogId === 'M01', 'Final archive lost the mission catalog id.');
+    const eliminatedScore = roundOneArchive?.scores?.find((score) => score.memberId === eliminatedOne);
+    assert(eliminatedScore?.pointsAwarded === 0, 'The eliminated participant received round points.');
 
     console.log(JSON.stringify({
       status: 'success',
