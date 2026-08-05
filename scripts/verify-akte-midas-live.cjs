@@ -157,6 +157,15 @@ async function run() {
       players.set(joined.member_id, client);
     }
 
+    const oversizedPackage = packageFor(1);
+    oversizedPackage.challenge = { ...oversizedPackage.challenge, catalogId: 'C08' };
+    await expectRpcFailure(
+      host,
+      'meta_host_configure_round',
+      { target_game_id: gameId, round_package: oversizedPackage },
+      'mindestens 6 anwesende Teilnehmer',
+    );
+
     await rpc(host, 'meta_host_configure_round', { target_game_id: gameId, round_package: packageFor(1) });
     let view = await hostView(host, gameId);
     assert(view.currentRoundState.mission.catalogId === 'M01', 'Mission catalog id was not stored.');
@@ -253,6 +262,18 @@ async function run() {
     assert(roundOneResult?.effect?.catalogId === 'B04', 'Mission bonus was not applied from the canonical catalog.');
     const eliminatedOne = roundOneResult.eliminatedId;
     assert(eliminatedOne === millionaireOne, 'Round one did not eliminate the deliberately exposed millionaire.');
+    await expectRpcFailure(
+      host,
+      'meta_host_set_member_status',
+      {
+        target_game_id: gameId,
+        target_member_id: eliminatedOne,
+        new_attendance_status: null,
+        new_competition_status: 'eligible',
+        change_reason: 'regression-check',
+      },
+      'nicht wieder in die Wertung',
+    );
 
     await rpc(host, 'meta_host_publish_result', { target_game_id: gameId });
     await rpc(host, 'meta_host_advance_round', { target_game_id: gameId });
