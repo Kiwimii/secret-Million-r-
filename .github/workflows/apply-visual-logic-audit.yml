@@ -39,7 +39,9 @@ jobs:
 
       - name: Apply audit changes
         if: steps.request.outputs.apply == 'true'
-        run: python scripts/apply-visual-logic-audit.py
+        run: |
+          python scripts/apply-visual-logic-audit.py
+          python scripts/apply-visual-logic-audit-live.py
 
       - name: Install dependencies
         if: steps.request.outputs.apply == 'true'
