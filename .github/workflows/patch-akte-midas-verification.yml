@@ -1,0 +1,81 @@
+name: Patch Akte Midas verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-akte-midas-verification.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch fixed catalog payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/verify-meta-v2-live.yml')
+          text = path.read_text()
+          start_marker = "          const roundPackage = (round) => ({\n"
+          end_marker = "          async function view(host, gameId) {\n"
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = '''          const roundPackage = (round) => ({
+            mission: {
+              catalogId: round === 1 ? 'M01' : 'M02',
+              title: round === 1 ? 'Operation Ehrlich' : 'Der diskrete Toast',
+              task: 'Eine feste Mission aus dem Akte-Midas-Katalog.',
+              successCriteria: 'Die Spielleitung bestätigt den Ausgang.',
+              timeWindow: 'Bis zur Abstimmung',
+            },
+            bonus: round === 1
+              ? { catalogId: 'B04', kind: 'add_vote', title: 'Schattenstimme', description: 'Eine zusätzliche Stimme.', selectionMode: 'target' }
+              : { catalogId: 'B01', kind: 'double_own_vote', title: 'Doppelmandat', description: 'Die eigene Stimme zählt doppelt.', selectionMode: 'none' },
+            malus: round === 2
+              ? { catalogId: 'X03', kind: 'points_penalty', title: 'Punktabzug', description: 'Ein Punkt Abzug.', amount: 1, selectionMode: 'none' }
+              : { catalogId: 'X05', kind: 'none', title: 'Kein Schutz', description: 'Kein zusätzlicher Effekt.', selectionMode: 'none' },
+            challenge: {
+              catalogId: round === 1 ? 'C01' : 'C02',
+              title: round === 1 ? 'Abwurfpunkt' : 'Transport ohne Würde',
+              briefing: 'Feste Feldoperation aus dem Akte-Midas-Katalog.',
+              winCondition: 'Die Spielleitung bestätigt Team Azur.',
+              duration: '6 Minuten',
+              material: 'Testmaterial',
+              safety: 'Keine Risiken.',
+            },
+          });
+
+'''
+          text = text[:start] + replacement + text[end:]
+          text = text.replace(
+            'grep -qi "Live Dashboard\\|Partie erstellen\\|Spiel beitreten" live-page.html',
+            'grep -qi "Akte Midas\\|Identität registrieren\\|Operation eröffnen" live-page.html',
+          )
+          path.write_text(text)
+          PY
+      - name: Commit conflict-safe update
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/update-akte-midas-live-test.yml
+          rm -f .github/workflows/patch-akte-midas-verification.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Verification already updated."
+            exit 0
+          fi
+          git commit -m "Update live verification for Akte Midas catalogs"
+          git pull --rebase origin main
+          git push origin main
