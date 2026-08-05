@@ -1,0 +1,37 @@
+name: Materialize Akte Midas migration
+
+on:
+  push:
+    branches: [agent/akte-midas-design-catalogs]
+    paths:
+      - ".github/workflows/materialize-akte-midas-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/akte-midas-design-catalogs
+      - name: Decode canonical migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/akte-midas-migration.sql.gz.b64 | gzip --decompress > supabase/migrations/20260805011100_meta_game_v2_akte_midas_catalogs.sql
+          test -s supabase/migrations/20260805011100_meta_game_v2_akte_midas_catalogs.sql
+          grep -q "meta_mission_catalog" supabase/migrations/20260805011100_meta_game_v2_akte_midas_catalogs.sql
+          grep -q "cancel_own_vote" supabase/migrations/20260805011100_meta_game_v2_akte_midas_catalogs.sql
+      - name: Commit migration and remove transport files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/akte-midas-migration.sql.gz.b64
+          rm .github/workflows/materialize-akte-midas-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add canonical Akte Midas database catalogs"
+          git push origin agent/akte-midas-design-catalogs
