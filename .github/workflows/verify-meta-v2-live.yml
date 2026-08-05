@@ -1,0 +1,150 @@
+name: Verify Akte Midas live
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "lib/**"
+      - "scripts/verify-akte-midas-live.cjs"
+      - "supabase/migrations/**"
+      - ".github/workflows/verify-meta-v2-live.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-akte-midas-live
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      LIVE_URL: https://kiwimii.github.io/secret-Million-r-/demo/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve public Supabase configuration
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_ID"
+          curl --fail --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"external_anonymous_users_enabled":true}' \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/auth" \
+            --output auth-config.json
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            --output api-keys.json
+          publishable_key=$(node <<'NODE'
+          const fs = require('node:fs');
+          const keys = JSON.parse(fs.readFileSync('api-keys.json', 'utf8'));
+          const selected = keys.find((item) => item.type === 'publishable')
+            ?? keys.find((item) => item.name === 'anon');
+          if (!selected?.api_key) process.exit(1);
+          process.stdout.write(selected.api_key);
+          NODE
+          )
+          echo "::add-mask::$publishable_key"
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_ID}.supabase.co" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key" >> "$GITHUB_ENV"
+
+      - name: Play complete Akte Midas production game
+        id: backend
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/verify-akte-midas-live.cjs 2>&1 | tee akte-midas-live.log
+
+      - name: Verify public dashboard
+        id: page
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error --location "$LIVE_URL" --output live-page.html \
+              && grep -qi "Akte Midas" live-page.html; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Public Akte Midas page did not become available in time."
+          exit 1
+
+      - name: Record authoritative status
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          PAGE_OUTCOME: ${{ steps.page.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          overall=erfolgreich
+          if [[ "$CONFIG_OUTCOME" != "success" || "$BACKEND_OUTCOME" != "success" || "$PAGE_OUTCOME" != "success" ]]; then
+            overall=fehlgeschlagen
+          fi
+          {
+            echo "# Secret Millionär · Akte Midas Live-Prüfung"
+            echo
+            echo "- Status: $overall"
+            echo "- Zeitpunkt (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Öffentliche Seite: $LIVE_URL"
+            echo "- Browser-Konfiguration: $CONFIG_OUTCOME"
+            echo "- Vollständiger Akte-Midas-Spieltest: $BACKEND_OUTCOME"
+            echo "- Dashboard HTTP-/Inhaltsprüfung: $PAGE_OUTCOME"
+            if [[ -f akte-midas-live.log ]]; then
+              echo
+              echo "## Letzte Testzeilen"
+              echo '```text'
+              tail -n 40 akte-midas-live.log
+              echo '```'
+            fi
+          } > docs/META_V2_LIVE_STATUS.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/META_V2_LIVE_STATUS.md
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "[skip ci] Record Akte Midas live status"
+          git pull --rebase origin main
+          git push origin main
+
+      - name: Enforce successful production verification
+        if: always()
+        env:
+          CONFIG_OUTCOME: ${{ steps.config.outcome }}
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          PAGE_OUTCOME: ${{ steps.page.outcome }}
+        run: |
+          test "$CONFIG_OUTCOME" = "success"
+          test "$BACKEND_OUTCOME" = "success"
+          test "$PAGE_OUTCOME" = "success"
