@@ -167,15 +167,15 @@ begin
 
   if becomes_unavailable and can_affect_round then
     if was_millionaire then
-      delete from public.meta_votes
-      where game_id = target_game_id and round_number = game_row.current_round;
-      delete from public.meta_vote_drafts
-      where game_id = target_game_id and round_number = game_row.current_round;
-      delete from public.meta_scores
-      where game_id = target_game_id and round_number = game_row.current_round;
+      delete from public.meta_votes v
+      where v.game_id = target_game_id and v.round_number = game_row.current_round;
+      delete from public.meta_vote_drafts d
+      where d.game_id = target_game_id and d.round_number = game_row.current_round;
+      delete from public.meta_scores s
+      where s.game_id = target_game_id and s.round_number = game_row.current_round;
 
-      select state -> 'rounds' -> current_round::text into round_state
-      from public.meta_games where id = target_game_id;
+      select g.state -> 'rounds' -> g.current_round::text into round_state
+      from public.meta_games g where g.id = target_game_id;
       round_state := round_state || jsonb_build_object(
         'millionaireId', null,
         'roleReleased', false,
@@ -190,28 +190,28 @@ begin
         'votingOpenedAt', null,
         'votingClosedAt', null
       );
-      update public.meta_games
-      set state = jsonb_set(state, array['rounds', current_round::text], round_state, true),
+      update public.meta_games g
+      set state = jsonb_set(g.state, array['rounds', g.current_round::text], round_state, true),
           phase = 'round_setup'
-      where id = target_game_id;
+      where g.id = target_game_id;
     else
-      delete from public.meta_votes
-      where game_id = target_game_id
-        and round_number = game_row.current_round
-        and (member_id = target_member_id or target_member_id = public.meta_host_set_member_status.target_member_id);
-      delete from public.meta_vote_drafts
-      where game_id = target_game_id
-        and round_number = game_row.current_round
-        and (member_id = target_member_id or target_member_id = public.meta_host_set_member_status.target_member_id);
+      delete from public.meta_votes v
+      where v.game_id = target_game_id
+        and v.round_number = game_row.current_round
+        and (v.member_id = target_member_id or v.target_member_id = target_member_id);
+      delete from public.meta_vote_drafts d
+      where d.game_id = target_game_id
+        and d.round_number = game_row.current_round
+        and (d.member_id = target_member_id or d.target_member_id = target_member_id);
 
-      select state -> 'rounds' -> current_round::text into round_state
-      from public.meta_games where id = target_game_id;
+      select g.state -> 'rounds' -> g.current_round::text into round_state
+      from public.meta_games g where g.id = target_game_id;
       if round_state -> 'effectSelection' ->> 'voterId' = target_member_id::text
          or round_state -> 'effectSelection' ->> 'targetId' = target_member_id::text then
         round_state := round_state || jsonb_build_object('effectSelection', null);
-        update public.meta_games
-        set state = jsonb_set(state, array['rounds', current_round::text], round_state, true)
-        where id = target_game_id;
+        update public.meta_games g
+        set state = jsonb_set(g.state, array['rounds', g.current_round::text], round_state, true)
+        where g.id = target_game_id;
       end if;
     end if;
 
