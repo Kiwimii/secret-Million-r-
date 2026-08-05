@@ -36,24 +36,33 @@ jobs:
           else
             echo "cleanup=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ -f .github/visual-logic-followup.request && -f scripts/apply-visual-logic-followup.py ]]; then
+            echo "followup=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "followup=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v4
-        if: steps.request.outputs.apply == 'true'
+        if: steps.request.outputs.apply == 'true' || steps.request.outputs.followup == 'true'
         with:
           node-version: 24
 
-      - name: Apply audit changes
+      - name: Apply initial audit changes
         if: steps.request.outputs.apply == 'true'
         run: |
           python scripts/apply-visual-logic-audit.py
           python scripts/apply-visual-logic-audit-live.py
 
+      - name: Apply final follow-up
+        if: steps.request.outputs.followup == 'true'
+        run: python scripts/apply-visual-logic-followup.py
+
       - name: Install dependencies
-        if: steps.request.outputs.apply == 'true'
+        if: steps.request.outputs.apply == 'true' || steps.request.outputs.followup == 'true'
         run: npm install
 
       - name: Validate patched branch
-        if: steps.request.outputs.apply == 'true'
+        if: steps.request.outputs.apply == 'true' || steps.request.outputs.followup == 'true'
         run: |
           npm run typecheck
           npm run lint
@@ -70,11 +79,11 @@ jobs:
           rm -f .github/visual-logic-cleanup.request
 
       - name: Commit branch changes
-        if: steps.request.outputs.apply == 'true' || steps.request.outputs.cleanup == 'true'
+        if: steps.request.outputs.apply == 'true' || steps.request.outputs.cleanup == 'true' || steps.request.outputs.followup == 'true'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Clean visual audit branch"
+          git commit -m "Finalize visual and game logic audit"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
