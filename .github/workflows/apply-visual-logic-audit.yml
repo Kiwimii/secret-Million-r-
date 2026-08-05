@@ -65,7 +65,8 @@ jobs:
         shell: bash
         run: |
           git fetch origin main
-          git checkout origin/main -- package-lock.json next-env.d.ts tsconfig.json
+          rm -f package-lock.json
+          git checkout origin/main -- next-env.d.ts tsconfig.json
           rm -f .github/visual-logic-cleanup.request
 
       - name: Commit branch changes
