@@ -22,5 +22,13 @@ export default defineConfig([
       "react-hooks/preserve-manual-memoization": "off",
     },
   },
+  {
+    files: ["scripts/**/*.cjs"],
+    rules: {
+      // Produktions-Smoke-Tests werden direkt mit Node als CommonJS-Skripte
+      // ausgeführt und verwenden deshalb bewusst require().
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   globalIgnores([".next/**", "out/**", "coverage/**", "next-env.d.ts"]),
 ]);
