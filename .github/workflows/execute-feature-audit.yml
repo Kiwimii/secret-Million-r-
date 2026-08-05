@@ -5,6 +5,7 @@ on:
     branches: [agent/intro-stability-audit]
     paths:
       - ".github/workflows/apply-intro-stability-audit.yml"
+      - ".github/audit-trigger"
 
 permissions:
   contents: write
