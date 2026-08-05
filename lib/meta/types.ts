@@ -26,6 +26,8 @@ export type EffectKind =
   | "redirect_vote"
   | "add_vote"
   | "remove_self_vote"
+  | "cancel_own_vote"
+  | "add_vote_against_self"
   | "points_bonus"
   | "points_penalty";
 
@@ -53,13 +55,21 @@ export interface MetaMember {
 }
 
 export interface MissionDefinition {
+  catalogId?: string;
   title: string;
   task: string;
   successCriteria: string;
   timeWindow: string;
+  difficulty?: "leicht" | "mittel" | "anspruchsvoll";
+  minPlayers?: number;
+  requirements?: string;
+  restriction?: string;
+  centralNote?: string;
+  tags?: string[];
 }
 
 export interface EffectDefinition {
+  catalogId?: string;
   kind: EffectKind;
   title: string;
   description: string;
@@ -68,12 +78,18 @@ export interface EffectDefinition {
 }
 
 export interface ChallengeDefinition {
+  catalogId?: string;
   title: string;
   briefing: string;
   winCondition: string;
   duration?: string;
   material?: string;
   safety?: string;
+  category?: string;
+  minPlayers?: number;
+  drinkRule?: string;
+  centralNote?: string;
+  tags?: string[];
 }
 
 export interface VoteTallyEntry {
