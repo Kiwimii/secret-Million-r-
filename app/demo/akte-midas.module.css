@@ -208,7 +208,7 @@
 @media(prefers-reduced-motion:reduce){.entry *,.entry *:before,.entry *:after,.intro *,.intro *:before,.intro *:after,.app *,.app *:before,.app *:after,.loading *,.loading *:before,.loading *:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
 
 /* visual-logic-audit */
-.nextStep{margin-top:12px;padding:12px 14px;border:1px solid rgba(196,161,90,.34);background:rgba(196,161,90,.07);display:grid;gap:4px}
+.nextStep{grid-column:1/-1;margin-top:12px;padding:12px 14px;border:1px solid rgba(196,161,90,.34);background:rgba(196,161,90,.07);display:grid;gap:4px}
 .nextStep span{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:#c4a15a}
 .nextStep strong{font-size:13px;color:#ded7ca;line-height:1.45}
 .capacityWarning,.invalidHint{margin:0 0 14px;padding:11px 13px;background:#2b1810;border:1px solid #76502c;color:#e7c69f;line-height:1.5;font-size:12px}

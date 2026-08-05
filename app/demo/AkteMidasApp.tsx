@@ -396,14 +396,16 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
   useEffect(() => { if (view.phase === "finished") setFinalOpen(true); }, [view.phase]);
 
   const activeCandidates = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound);
+  const availableParticipants = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus !== "disqualified" && member.activeFromRound <= view.currentRound);
   const activeCount = activeCandidates.length;
-  const compatibleMissions = MISSION_CATALOG.filter((entry) => entry.minPlayers <= activeCount);
-  const compatibleChallenges = CHALLENGE_CATALOG.filter((entry) => entry.minPlayers <= activeCount);
+  const availableCount = availableParticipants.length;
+  const compatibleMissions = MISSION_CATALOG.filter((entry) => entry.minPlayers <= availableCount);
+  const compatibleChallenges = CHALLENGE_CATALOG.filter((entry) => entry.minPlayers <= availableCount);
   const mission = missionById(missionId);
   const challenge = challengeById(challengeId);
   const bonus = bonusById(bonusId);
   const malus = malusById(malusId);
-  const packageCompatible = mission.minPlayers <= activeCount && challenge.minPlayers <= activeCount;
+  const packageCompatible = mission.minPlayers <= availableCount && challenge.minPlayers <= availableCount;
   const usedMissionIds = useMemo(() => Object.values(view.rounds ?? {}).map((entry) => entry.mission?.catalogId).filter((id): id is string => Boolean(id)), [view.rounds]);
   const usedChallengeIds = useMemo(() => Object.values(view.rounds ?? {}).map((entry) => entry.challenge?.catalogId).filter((id): id is string => Boolean(id)), [view.rounds]);
 
@@ -427,8 +429,8 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
 
   const submitted = activeCandidates.filter((member) => member.voteSubmitted).length;
   const isBusy = Boolean(busyAction);
-  const nextStep = activeCount < 4
-    ? `Mindestens vier aktive Spieler werden benötigt. Aktuell: ${activeCount}.`
+  const nextStep = availableCount < 4
+    ? `Mindestens vier anwesende Teilnehmer werden benötigt. Aktuell: ${availableCount}.`
     : !round.mission?.catalogId || !round.challenge?.catalogId
       ? "Rundenpaket auswählen und versiegeln."
       : !round.millionaireId
@@ -462,9 +464,9 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
             <div className={styles.metrics}><div><span>Aktive Kandidaten</span><strong>{activeCandidates.length}</strong></div><div><span>Verriegelte Stimmen</span><strong>{submitted}/{activeCandidates.length}</strong></div><div><span>Millionär</span><strong>{round.millionaireId ? getName(view, round.millionaireId) : "Nicht ausgelost"}</strong></div><div><span>Aktenrevision</span><strong>{view.revision}</strong></div><div className={styles.nextStep}><span>Nächster Schritt</span><strong>{nextStep}</strong></div></div>
           </Card>
           <Card eyebrow="Versiegelte Auswahl" title="Rundenpaket" subtitle="Mission, Feldoperation, Bonus und Malus sind getrennte, feste Katalogeinträge. Freitext wurde aus guten Gründen aus dem Gebäude begleitet.">
-            {!packageCompatible && <div className={styles.capacityWarning}>Auswahl nicht spielbar: Mission benötigt {mission.minPlayers}, Challenge {challenge.minPlayers}, verfügbar sind {activeCount} aktive Spieler.</div>}<div className={styles.catalogControls}>
-              <label>Geheime Mission<select value={missionId} onChange={(event) => setMissionId(event.target.value)}>{MISSION_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > activeCount}>{entry.catalogId} · {entry.title} · {entry.difficulty} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleMissions.length === 0} onClick={() => setMissionId(randomUnused(compatibleMissions, usedMissionIds).catalogId)}>Passende Mission ziehen</button>
-              <label>Team-Challenge<select value={challengeId} onChange={(event) => setChallengeId(event.target.value)}>{CHALLENGE_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > activeCount}>{entry.catalogId} · {entry.title} · {entry.category} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleChallenges.length === 0} onClick={() => setChallengeId(randomUnused(compatibleChallenges, usedChallengeIds).catalogId)}>Passende Challenge ziehen</button>
+            {!packageCompatible && <div className={styles.capacityWarning}>Auswahl nicht spielbar: Mission benötigt {mission.minPlayers}, Challenge {challenge.minPlayers}, verfügbar sind {availableCount} anwesende Teilnehmer.</div>}<div className={styles.catalogControls}>
+              <label>Geheime Mission<select value={missionId} onChange={(event) => setMissionId(event.target.value)}>{MISSION_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > availableCount}>{entry.catalogId} · {entry.title} · {entry.difficulty} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleMissions.length === 0} onClick={() => setMissionId(randomUnused(compatibleMissions, usedMissionIds).catalogId)}>Passende Mission ziehen</button>
+              <label>Team-Challenge<select value={challengeId} onChange={(event) => setChallengeId(event.target.value)}>{CHALLENGE_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId} disabled={entry.minPlayers > availableCount}>{entry.catalogId} · {entry.title} · {entry.category} · ab {entry.minPlayers}</option>)}</select></label><button disabled={isBusy || compatibleChallenges.length === 0} onClick={() => setChallengeId(randomUnused(compatibleChallenges, usedChallengeIds).catalogId)}>Passende Challenge ziehen</button>
               <label>Bonus bei Erfolg<select value={bonusId} onChange={(event) => setBonusId(event.target.value)}>{BONUS_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title}</option>)}</select></label>
               <label>Malus bei Misserfolg<select value={malusId} onChange={(event) => setMalusId(event.target.value)}>{MALUS_CATALOG.map((entry) => <option value={entry.catalogId} key={entry.catalogId}>{entry.catalogId} · {entry.title}</option>)}</select></label>
             </div>
@@ -496,7 +498,18 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
 }
 
 function HostMemberRow({ member, controller }: { member: MetaMember; controller: ReturnType<typeof useMetaGame> }) {
-  return <div className={styles.hostMemberRow}><span className={styles.avatar}>{member.displayName[0]}</span><div><strong>{member.displayName}</strong><small>{memberStatus(member)} · aktiv ab R{member.activeFromRound} · {member.points ?? 0} Punkte</small></div><label className={styles.memberStatusControl}><span>Anwesenheit</span><select value={member.attendanceStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, attendanceStatus: event.target.value as MetaMember["attendanceStatus"] })}><option value="present">Anwesend</option><option value="temporarily_absent">Vorübergehend abwesend</option><option value="departed">Abgereist</option></select></label><label className={styles.memberStatusControl}><span>Wertung</span><select value={member.competitionStatus} onChange={(event) => void controller.setMemberStatus({ memberId: member.id, competitionStatus: event.target.value as MetaMember["competitionStatus"] })}>{member.competitionStatus === "eligible" && <option value="eligible">Aktiv</option>}{member.competitionStatus !== "disqualified" && <option value="eliminated">Aus der Wertung</option>}<option value="disqualified">Disqualifiziert</option></select></label></div>;
+  function changeAttendance(next: MetaMember["attendanceStatus"]) {
+    if (next === member.attendanceStatus) return;
+    if (next === "departed" && !window.confirm(`${member.displayName} als abgereist markieren? Das beendet die Teilnahme an der Wertung dauerhaft.`)) return;
+    void controller.setMemberStatus({ memberId: member.id, attendanceStatus: next });
+  }
+  function changeCompetition(next: MetaMember["competitionStatus"]) {
+    if (next === member.competitionStatus) return;
+    const label = next === "disqualified" ? "disqualifizieren" : "aus der Wertung nehmen";
+    if (!window.confirm(`${member.displayName} wirklich ${label}? Diese Entscheidung kann innerhalb der Partie nicht rückgängig gemacht werden.`)) return;
+    void controller.setMemberStatus({ memberId: member.id, competitionStatus: next });
+  }
+  return <div className={styles.hostMemberRow}><span className={styles.avatar}>{member.displayName[0]}</span><div><strong>{member.displayName}</strong><small>{memberStatus(member)} · aktiv ab R{member.activeFromRound} · {member.points ?? 0} Punkte</small></div><label className={styles.memberStatusControl}><span>Anwesenheit</span><select value={member.attendanceStatus} onChange={(event) => changeAttendance(event.target.value as MetaMember["attendanceStatus"])}><option value="present">Anwesend</option><option value="temporarily_absent">Vorübergehend abwesend</option><option value="departed">Abgereist</option></select></label><label className={styles.memberStatusControl}><span>Wertung</span><select value={member.competitionStatus} onChange={(event) => changeCompetition(event.target.value as MetaMember["competitionStatus"])}>{member.competitionStatus === "eligible" && <option value="eligible">Aktiv</option>}{member.competitionStatus !== "disqualified" && <option value="eliminated">Aus der Wertung</option>}<option value="disqualified">Disqualifiziert</option></select></label></div>;
 }
 
 function TeamPanel({ team, view, round }: { team: TeamCode; view: MetaGameView; round: MetaRoundState }) {
@@ -517,18 +530,23 @@ function ParticipantNotes({ view, controller }: { view: MetaGameView; controller
 
 function EffectSelection({ view, round, controller }: { view: MetaGameView; round: MetaRoundState; controller: ReturnType<typeof useMetaGame> }) {
   const effect = round.missionStatus === "completed" ? round.bonus : round.missionStatus === "failed" ? round.malus : undefined;
+  const selectable = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound && member.id !== view.memberId);
+  const selectableKey = selectable.map((member) => member.id).join("|");
   const [voterId, setVoterId] = useState(round.effectSelection?.voterId ?? "");
   const [targetId, setTargetId] = useState(round.effectSelection?.targetId ?? "");
   useEffect(() => {
-    setVoterId(round.effectSelection?.voterId ?? "");
-    setTargetId(round.effectSelection?.targetId ?? "");
-  }, [round.number, round.effectSelection?.voterId, round.effectSelection?.targetId]);
+    const savedVoter = round.effectSelection?.voterId ?? "";
+    const savedTarget = round.effectSelection?.targetId ?? "";
+    setVoterId(savedVoter && selectable.some((member) => member.id === savedVoter) ? savedVoter : "");
+    setTargetId(savedTarget && selectable.some((member) => member.id === savedTarget) ? savedTarget : "");
+  }, [round.number, round.effectSelection?.voterId, round.effectSelection?.targetId, selectableKey]);
   if (!effect || effect.kind === "none" || effect.selectionMode === "none") return null;
-  const selectable = view.members.filter((member) => member.attendanceStatus === "present" && member.competitionStatus === "eligible" && member.activeFromRound <= view.currentRound && member.id !== view.memberId);
   const requiresVoter = ["voter", "source_and_target"].includes(effect.selectionMode ?? "");
   const requiresTarget = ["target", "source_and_target"].includes(effect.selectionMode ?? "");
-  const selectionComplete = (!requiresVoter || Boolean(voterId)) && (!requiresTarget || Boolean(targetId));
-  return <div className={styles.effectSelection}><h4>Effektziel festlegen: {effect.title}</h4>{requiresVoter && <label>Betroffener Wähler<select value={voterId} onChange={(event) => setVoterId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}{requiresTarget && <label>Zielperson<select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}<button disabled={!selectionComplete} onClick={() => void controller.setEffectSelection({ voterId, targetId })}>Auswahl verriegeln</button>{!selectionComplete && <small className={styles.invalidHint}>Der Effekt verfällt ohne vollständige Auswahl.</small>}</div>;
+  const validVoter = !requiresVoter || selectable.some((member) => member.id === voterId);
+  const validTarget = !requiresTarget || selectable.some((member) => member.id === targetId);
+  const selectionComplete = validVoter && validTarget;
+  return <div className={styles.effectSelection}><h4>Effektziel festlegen: {effect.title}</h4>{requiresVoter && <label>Betroffener Wähler<select value={voterId} onChange={(event) => setVoterId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}{requiresTarget && <label>Zielperson<select value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Auswählen</option>{selectable.map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}</select></label>}<button disabled={!selectionComplete} onClick={() => void controller.setEffectSelection({ voterId, targetId })}>Auswahl verriegeln</button>{!selectionComplete && <small className={styles.invalidHint}>Der Effekt verfällt ohne vollständige und weiterhin gültige Auswahl.</small>}</div>;
 }
 
 function PlayerDashboard({ view, controller }: { view: MetaGameView; controller: ReturnType<typeof useMetaGame> }) {
@@ -570,7 +588,11 @@ function RevealOverlay({ view, round, onClose, onPublish }: { view: MetaGameView
   const [step, setStep] = useState(0);
   const lines = ["Die Stimmen sind verriegelt.",result.effect?.kind && result.effect.kind !== "none" ? `Missionsfolge aktiv: ${result.effect.title}` : "Keine Missionsfolge verändert die Stimmen.",result.tieResolvedBy === "lot" ? "Gleichstand. Das Los übernimmt die Verantwortung." : "Das Ergebnis ist eindeutig. Unangenehm, aber eindeutig.",`${getName(view,result.eliminatedId)} erhält die meisten wirksamen Stimmen.`,result.millionaireSurvived ? "Der Millionär überlebt die Runde." : "Der Millionär wurde enttarnt.",result.millionaireSurvived ? `${getName(view,result.millionaireId)} bleibt als Millionär im Spiel.` : `${getName(view,result.millionaireId)} war der Millionär.`];
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || step >= lines.length - 1) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setStep(lines.length - 1);
+      return;
+    }
+    if (step >= lines.length - 1) return;
     const timer = window.setTimeout(() => setStep((current) => Math.min(lines.length - 1, current + 1)), 1750);
     return () => window.clearTimeout(timer);
   }, [step, lines.length]);

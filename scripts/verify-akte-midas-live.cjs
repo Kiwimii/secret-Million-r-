@@ -163,7 +163,7 @@ async function run() {
       host,
       'meta_host_configure_round',
       { target_game_id: gameId, round_package: oversizedPackage },
-      'mindestens 6 aktive Spieler',
+      'mindestens 6 anwesende Teilnehmer',
     );
 
     await rpc(host, 'meta_host_configure_round', { target_game_id: gameId, round_package: packageFor(1) });

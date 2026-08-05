@@ -18,7 +18,7 @@ describe("Akte Midas visual and logic audit", () => {
   it("guides the host and blocks incompatible catalog choices", () => {
     const app = source("app/demo/AkteMidasApp.tsx");
     expect(app).toContain("const nextStep");
-    expect(app).toContain("entry.minPlayers > activeCount");
+    expect(app).toContain("entry.minPlayers > availableCount");
     expect(app).toContain("!packageCompatible");
     expect(app).toContain("!round.winningTeam");
   });
@@ -54,5 +54,9 @@ describe("Akte Midas visual and logic audit", () => {
     expect(migration).toContain("können nicht wieder in die Wertung aufgenommen werden");
     expect(migration).toContain("v.target_member_id = target_member_id");
     expect(migration).toContain("'challengePublished', false");
+    const finalMigration = source("supabase/migrations/20260805011400_meta_game_v2_final_logic_hardening.sql");
+    expect(finalMigration).toContain("m.competition_status <> 'disqualified'");
+    expect(finalMigration).toContain("meta_host_advance_round_final_base");
+    expect(finalMigration).toContain("direct_winner_available");
   });
 });
