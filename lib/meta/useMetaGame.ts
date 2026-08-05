@@ -111,6 +111,7 @@ export function useMetaGame(): MetaGameController {
   const configured = isSupabaseConfigured();
   const clientRef = useRef<SupabaseClient | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const loadSequenceRef = useRef(0);
   const identityRef = useRef<MetaIdentity | undefined>(undefined);
   const [ready, setReady] = useState(!configured);
   const [loading, setLoading] = useState(configured);
@@ -130,10 +131,14 @@ export function useMetaGame(): MetaGameController {
     const active = target ?? identityRef.current;
     const client = clientRef.current;
     if (!client || !active) return;
+    const requestId = ++loadSequenceRef.current;
     const next = await rpc<MetaGameView>(client, "meta_get_game_view", {
       target_game_id: active.gameId,
     });
-    setView(next);
+    if (requestId !== loadSequenceRef.current || identityRef.current?.gameId !== active.gameId) return;
+    setView((current) => (
+      !current || current.gameId !== next.gameId || next.revision >= current.revision ? next : current
+    ));
     setError(undefined);
   }, []);
 
@@ -216,7 +221,10 @@ export function useMetaGame(): MetaGameController {
   const mutate = useCallback(async (name: string, args: Record<string, unknown> = {}) => {
     const client = clientRef.current;
     const active = identityRef.current;
-    if (!client || !active) throw new Error("Keine aktive Spielinstanz.");
+    if (!client || !active) {
+      setError("Keine aktive Spielinstanz.");
+      return;
+    }
     setLoading(true);
     try {
       await rpc(client, name, { target_game_id: active.gameId, ...args });
@@ -224,7 +232,6 @@ export function useMetaGame(): MetaGameController {
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Aktion fehlgeschlagen.";
       setError(message);
-      throw caught;
     } finally {
       setLoading(false);
     }
@@ -293,6 +300,7 @@ export function useMetaGame(): MetaGameController {
   }, [load, setIdentity]);
 
   const clearSession = useCallback(async () => {
+    loadSequenceRef.current += 1;
     const client = clientRef.current;
     if (client && channelRef.current) await client.removeChannel(channelRef.current);
     setIdentity(undefined);
