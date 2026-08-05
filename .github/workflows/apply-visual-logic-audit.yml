@@ -1,0 +1,64 @@
+name: Apply visual logic audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.ref == 'agent/visual-logic-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Detect one-shot request
+        id: request
+        shell: bash
+        run: |
+          if [[ -f .github/visual-logic-audit.request && -f scripts/apply-visual-logic-audit.py ]]; then
+            echo "apply=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apply=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.request.outputs.apply == 'true'
+        with:
+          node-version: 24
+
+      - name: Apply audit changes
+        if: steps.request.outputs.apply == 'true'
+        run: python scripts/apply-visual-logic-audit.py
+
+      - name: Install dependencies
+        if: steps.request.outputs.apply == 'true'
+        run: npm install
+
+      - name: Validate patched branch
+        if: steps.request.outputs.apply == 'true'
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+
+      - name: Commit patched branch
+        if: steps.request.outputs.apply == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve visual guidance and game logic"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
