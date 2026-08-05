@@ -472,7 +472,7 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
             </div>
             <div className={styles.catalogGrid}><MissionPreview mission={mission} /><ChallengePreview challenge={challenge} /></div>
             <div className={styles.effectGrid}><EffectPreview label="Bonus bei Erfolg" effect={bonus} tone="bonus" /><EffectPreview label="Malus bei Misserfolg" effect={malus} tone="malus" /></div>
-            <button className={styles.primaryButton} disabled={!['lobby','round_setup'].includes(view.phase) || busyAction === "configure"} onClick={() => void run("configure", () => controller.configureRound(packageInput()))}>Rundenpaket versiegeln</button>
+            <button className={styles.primaryButton} disabled={isBusy || !packageCompatible || !['lobby','round_setup'].includes(view.phase)} onClick={() => void run("configure", () => controller.configureRound(packageInput()))}>Rundenpaket versiegeln</button>
           </Card>
           <Card eyebrow="Befehlskette" title="Zentrale Rundensteuerung" subtitle="Der Ablauf kann jederzeit fortgesetzt werden. Fehlende Reaktionen einzelner Teilnehmer sind Warnungen, keine Geiselnahme.">
             <div className={styles.controlFlow}>
