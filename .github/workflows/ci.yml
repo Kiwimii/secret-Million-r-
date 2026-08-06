@@ -5,7 +5,96 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
+  apply_sync_patch:
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/reliable-sync-via-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout patch branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Apply reliable live synchronization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          hook = Path('lib/live/useLiveGame.ts')
+          text = hook.read_text()
+          marker = '''  useEffect(() => {
+    if (!identity || identity.accessRole !== "player") return;
+    const timer = window.setInterval(() => {
+      const client = clientRef.current;
+      if (!client) return;
+      const patch = progressRef.current;
+      void rpcRows(client, "update_own_player_progress", {
+        target_game_id: identity.gameId,
+        requested_screen_key: patch.screenKey,
+        requested_step_key: patch.stepKey,
+        requested_phase_seen: patch.phaseSeen,
+        requested_role_revealed: patch.roleRevealed ?? null,
+        requested_mission_opened: patch.missionOpened ?? null,
+        requested_advantage_opened: patch.advantageOpened ?? null,
+        requested_challenge_opened: patch.challengeBriefingOpened ?? null,
+        requested_vote_submitted: patch.voteSubmitted ?? null,
+        requested_role_decision_submitted: patch.roleDecisionSubmitted ?? null,
+      }).catch(() => undefined);
+    }, HEARTBEAT_MS);
+    return () => window.clearInterval(timer);
+  }, [identity]);
+'''
+          addition = marker + '''
+  // Realtime bleibt der schnelle Weg. Das Polling ist der verlässliche Rückfall,
+  // falls ein Mobilbrowser die WebSocket-Verbindung pausiert oder verwirft.
+  useEffect(() => {
+    if (!identity) return;
+    let disposed = false;
+
+    const syncNow = () => {
+      if (disposed) return;
+      void refreshForIdentity(identity).catch(() => undefined);
+    };
+    const timer = window.setInterval(syncNow, 2500);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") syncNow();
+    };
+
+    window.addEventListener("focus", syncNow);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncNow);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [identity, refreshForIdentity]);
+'''
+          if 'Das Polling ist der verlässliche Rückfall' not in text:
+              if marker not in text:
+                  raise SystemExit('Heartbeat-Marker nicht gefunden')
+              hook.write_text(text.replace(marker, addition, 1))
+
+          migration = Path('supabase/migrations/20260724002000_reliable_live_sync.sql')
+          if not migration.exists():
+              migration.write_text('''-- Verlässliche Mehrgeräte-Synchronisation auch bei pausierten Mobil-WebSockets.\n\ndrop trigger if exists live_refresh_player_progress on public.player_progress;\ncreate trigger live_refresh_player_progress\nafter insert or update or delete on public.player_progress\nfor each row execute function public.emit_live_game_refresh();\n\ncomment on trigger live_refresh_player_progress on public.player_progress is\n  'Informiert andere Geräte über geänderte Spieleransichten; der Client nutzt zusätzlich ein Polling-Fallback.';\n''')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/live/useLiveGame.ts supabase/migrations/20260724002000_reliable_live_sync.sql
+          if git diff --cached --quiet; then
+            echo "Patch bereits angewendet."
+          else
+            git commit -m "fix: make live synchronization resilient"
+            git push origin HEAD:${GITHUB_HEAD_REF}
+          fi
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
