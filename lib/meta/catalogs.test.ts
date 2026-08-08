@@ -9,16 +9,16 @@ import {
 } from "./catalogs";
 
 describe("Akte Midas catalogs", () => {
-  it("contains exactly twenty fixed missions and twenty fixed challenges", () => {
-    expect(MISSION_CATALOG).toHaveLength(20);
-    expect(CHALLENGE_CATALOG).toHaveLength(20);
+  it("contains exactly twenty-four fixed missions and twenty-four fixed challenges", () => {
+    expect(MISSION_CATALOG).toHaveLength(24);
+    expect(CHALLENGE_CATALOG).toHaveLength(24);
   });
 
   it("uses unique catalog ids and complete canonical definitions", () => {
     const missionIds = MISSION_CATALOG.map((entry) => entry.catalogId);
     const challengeIds = CHALLENGE_CATALOG.map((entry) => entry.catalogId);
-    expect(new Set(missionIds).size).toBe(20);
-    expect(new Set(challengeIds).size).toBe(20);
+    expect(new Set(missionIds).size).toBe(24);
+    expect(new Set(challengeIds).size).toBe(24);
     for (const mission of MISSION_CATALOG) {
       expect(mission.task.length).toBeGreaterThan(30);
       expect(mission.successCriteria.length).toBeGreaterThan(20);
