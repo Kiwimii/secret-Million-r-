@@ -275,8 +275,27 @@ async function run() {
       'nicht wieder in die Wertung',
     );
 
+    const noteText = `Verdacht-${stamp.slice(-4)}`;
+    await rpc(players.get(effectTarget.id), 'meta_save_note', { target_game_id: gameId, subject_member_id: alternateTarget.id, note_text: noteText });
     await rpc(host, 'meta_host_publish_result', { target_game_id: gameId });
-    await rpc(host, 'meta_host_advance_round', { target_game_id: gameId });
+
+    const publicReport = await rpc(players.get(effectTarget.id), 'meta_get_game_view', { target_game_id: gameId });
+    assert(!('millionaireId' in publicReport.currentRoundState.result), 'Published player report leaked the millionaire id.');
+    assert(!('millionaireSurvived' in publicReport.currentRoundState.result), 'Published player report leaked whether the millionaire survived.');
+
+    view = await hostView(host, gameId);
+    const voteAudit = view.notifications.find((event) => event.eventType === 'vote_submitted' && event.payload?.actorMemberId);
+    assert(voteAudit, 'Host audit log does not identify the player who submitted a vote.');
+    const noteAudit = view.notifications.find((event) => event.eventType === 'note_saved_host' && event.payload?.actorMemberId === effectTarget.id && event.payload?.subjectMemberId === alternateTarget.id);
+    assert(noteAudit && noteAudit.body.includes(noteText), 'Host audit log does not show note author, subject and note text.');
+
+    await expectRpcFailure(host, 'meta_host_advance_round', { target_game_id: gameId }, 'privaten Rollenentscheidung');
+    await expectRpcFailure(players.get(millionaireOne), 'meta_player_role_decision', { target_game_id: gameId, role_decision: 'keep' }, 'nicht mehr für die Wertung');
+    await rpc(players.get(millionaireOne), 'meta_player_role_decision', { target_game_id: gameId, role_decision: 'transfer' });
+
+    view = await hostView(host, gameId);
+    assert(view.currentRound === 2 && view.phase === 'round_setup', 'Private role decision did not start round two automatically.');
+    assert(view.currentRoundState.millionaireId && view.currentRoundState.millionaireId !== millionaireOne, 'Transfer did not assign a new valid millionaire.');
     await rpc(host, 'meta_host_configure_round', { target_game_id: gameId, round_package: packageFor(2) });
     await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
     await rpc(host, 'meta_host_publish_mission', { target_game_id: gameId });
