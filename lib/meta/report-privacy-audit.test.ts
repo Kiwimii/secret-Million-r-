@@ -22,8 +22,10 @@ describe("round report privacy and host audit trail", () => {
     expect(app).toContain("Millionär bleiben");
     expect(app).toContain("Zufällig neu auslosen");
     expect(app).toContain("Warte auf Rollenentscheidung");
+    expect(app).toContain("view.currentRound < view.totalRounds");
     expect(migration).toContain("role_decision_and_round_started");
     expect(migration).toContain("privaten Rollenentscheidung des Millionärs");
+    expect(migration).toContain("game_row.current_round < game_row.total_rounds");
   });
 
   it("removes millionaire identity and survival state from player reports", () => {
@@ -39,12 +41,14 @@ describe("round report privacy and host audit trail", () => {
     expect(migration).toContain("actorMemberId");
     expect(migration).toContain("note_saved_host");
     expect(migration).toContain("subjectMemberId");
+    expect(migration).toContain("visibility_mode = 'host'");
     expect(migration).toContain("hat seine Stimme verbindlich abgegeben");
   });
 
   it("covers the real production path", () => {
     const live = source("scripts/verify-akte-midas-live.cjs");
     expect(live).toContain("Published player report leaked the millionaire id");
+    expect(live).toContain("Published player report leaked whether the millionaire survived");
     expect(live).toContain("Host audit log does not identify the player who submitted a vote");
     expect(live).toContain("Host audit log does not show note author, subject and note text");
     expect(live).toContain("Private role decision did not start round two automatically");
