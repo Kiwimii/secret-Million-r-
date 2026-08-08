@@ -15,6 +15,7 @@ describe("three-player Akte Midas content", () => {
     const entries = MISSION_CATALOG.filter((entry) => THREE_PLAYER_MISSIONS.includes(entry.catalogId));
     expect(entries).toHaveLength(4);
     expect(entries.every((entry) => entry.minPlayers === 3)).toBe(true);
+    expect(entries.every((entry) => entry.tags.includes("3-spieler"))).toBe(true);
     expect(new Set(entries.map((entry) => entry.title)).size).toBe(4);
   });
 
@@ -22,6 +23,8 @@ describe("three-player Akte Midas content", () => {
     const entries = CHALLENGE_CATALOG.filter((entry) => THREE_PLAYER_CHALLENGES.includes(entry.catalogId));
     expect(entries).toHaveLength(4);
     expect(entries.every((entry) => entry.minPlayers === 3)).toBe(true);
+    expect(entries.every((entry) => entry.tags.includes("3-spieler"))).toBe(true);
+    expect(entries.every((entry) => entry.tags.includes("teamneutral"))).toBe(true);
     expect(entries.every((entry) => entry.winCondition.length > 20)).toBe(true);
   });
 
