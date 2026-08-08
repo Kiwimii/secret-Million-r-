@@ -1,17 +1,15 @@
 # Secret Millionär · Akte Midas Live-Prüfung
 
-- Status: fehlgeschlagen
-- Zeitpunkt (UTC): 2026-08-08T13:25:25Z
-- Commit: 688a8cb9886b6953399aa7a71c7ad7118e515cc8
+- Status: erfolgreich
+- Zeitpunkt (UTC): 2026-08-08T13:32:30Z
+- Commit: ab2d65a481882c0816e7cde8877819d3fdd438af
 - Öffentliche Seite: https://kiwimii.github.io/secret-Million-r-/demo/
 - Browser-Konfiguration: success
-- Vollständiger Akte-Midas-Spieltest: failure
+- Vollständiger Akte-Midas-Spieltest: success
 - Dashboard HTTP-/Inhaltsprüfung: success
 
 ## Letzte Testzeilen
 ```text
-Error: meta_save_note: column reference "subject_member_id" is ambiguous
-    at rpc (/home/runner/work/secret-Million-r-/secret-Million-r-/scripts/verify-akte-midas-live.cjs:25:27)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async run (/home/runner/work/secret-Million-r-/secret-Million-r-/scripts/verify-akte-midas-live.cjs:279:5)
+{"status":"success","gameId":"bde0871f-12b0-4eca-ba0c-b49ff7754536","rounds":2,"players":5,"winnerId":"96a03945-41e3-4676-90a0-eb14b5e0d039"}
+{"status":"three-player-success","gameId":"3876317f-f112-42e2-b334-5a6aa60be6ad","players":3,"mission":"M21","challenge":"C21"}
 ```
