@@ -46,10 +46,11 @@ describe("round report privacy and host audit trail", () => {
   });
 
   it("saves notes without ambiguous SQL identifiers", () => {
-    const fix = source("supabase/migrations/20260808132500_meta_game_v2_note_audit_fix.sql");
+    const fix = source("supabase/migrations/20260808133000_meta_game_v2_note_conflict_target_fix.sql");
     expect(fix).toContain("join public.meta_members s on s.id = $2");
     expect(fix).toContain("values (target_game_id, own_member, $2, saved_note, now())");
-    expect(fix).not.toContain("meta_save_note_audit_base(target_game_id");
+    expect(fix).toContain("on conflict on constraint meta_notes_pkey");
+    expect(fix).not.toContain("on conflict (game_id, author_member_id, subject_member_id)");
     expect(fix).toContain("'subjectMemberId', $2");
   });
 
