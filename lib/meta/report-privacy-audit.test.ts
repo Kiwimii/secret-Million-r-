@@ -45,6 +45,14 @@ describe("round report privacy and host audit trail", () => {
     expect(migration).toContain("hat seine Stimme verbindlich abgegeben");
   });
 
+  it("saves notes without ambiguous SQL identifiers", () => {
+    const fix = source("supabase/migrations/20260808132500_meta_game_v2_note_audit_fix.sql");
+    expect(fix).toContain("join public.meta_members s on s.id = $2");
+    expect(fix).toContain("values (target_game_id, own_member, $2, saved_note, now())");
+    expect(fix).not.toContain("meta_save_note_audit_base(target_game_id");
+    expect(fix).toContain("'subjectMemberId', $2");
+  });
+
   it("covers the real production path", () => {
     const live = source("scripts/verify-akte-midas-live.cjs");
     expect(live).toContain("Published player report leaked the millionaire id");
