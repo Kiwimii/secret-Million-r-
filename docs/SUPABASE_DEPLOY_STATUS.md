@@ -1,8 +1,8 @@
 # Supabase-Datenbank-Deployment
 
 - Status: erfolgreich
-- Zeitpunkt (UTC): 2026-08-08T12:45:09Z
-- Commit: 7c8e80120fb194ec579ba94abc7915c829a20825
+- Zeitpunkt (UTC): 2026-08-08T13:19:57Z
+- Commit: d58c4a866c405db5d748b01e2700289bc7b555c6
 - Secrets geprüft: success
 - Projektverknüpfung: success
 - Migrationsvorschau: success
@@ -18,16 +18,16 @@ Using database password *** env var...
 DRY RUN: migrations will *not* be pushed to the database.
 Connecting to remote database...
 Would push these migrations:
- • 20260808090100_meta_game_v2_three_player_catalogs.sql
+ • 20260808131500_meta_game_v2_private_reports_audit_role_choice.sql
 Finished supabase db push.
 --- supabase-apply.log ---
 NotFound: FileSystem.readFile (/home/runner/.supabase/profile)
 Using database password *** env var...
 Connecting to remote database...
 Do you want to push these migrations to the remote database?
- • 20260808090100_meta_game_v2_three_player_catalogs.sql
+ • 20260808131500_meta_game_v2_private_reports_audit_role_choice.sql
  [Y/n] 
-Applying migration 20260808090100_meta_game_v2_three_player_catalogs.sql...
+Applying migration 20260808131500_meta_game_v2_private_reports_audit_role_choice.sql...
 v1.74.3: Pulling from supabase/edge-runtime
 597c6c618d36: Pulling fs layer
 c39190ba742d: Pulling fs layer
@@ -38,14 +38,16 @@ ba9e24d39072: Pulling fs layer
 0d29c829782d: Waiting
 662b1f44f1ee: Waiting
 ba9e24d39072: Waiting
+60414ed24b30: Verifying Checksum
 60414ed24b30: Download complete
-597c6c618d36: Verifying Checksum
 597c6c618d36: Download complete
+c39190ba742d: Verifying Checksum
 c39190ba742d: Download complete
 0d29c829782d: Verifying Checksum
 0d29c829782d: Download complete
 ba9e24d39072: Verifying Checksum
 ba9e24d39072: Download complete
+662b1f44f1ee: Verifying Checksum
 662b1f44f1ee: Download complete
 597c6c618d36: Pull complete
 c39190ba742d: Pull complete
