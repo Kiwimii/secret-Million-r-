@@ -342,7 +342,82 @@ async function run() {
   }
 }
 
-run().catch((error) => {
-  console.error(error.stack || error.message || String(error));
-  process.exit(1);
-});
+async function verifyThreePlayerCatalog() {
+  const host = makeClient();
+  const playerClients = [];
+  let gameId;
+  const stamp = `${Date.now()}`;
+  try {
+    await authenticate(host, 'three-player-host');
+    const created = await rpc(host, 'meta_create_game', {
+      game_title: `Akte-Midas-Three-${stamp}`,
+      host_pin: '2486',
+      requested_rounds: 2,
+      requested_final_rule: 'classic',
+      requested_notes_visibility: 'host',
+    });
+    gameId = created?.game_id;
+    const joinCode = String(created?.join_code ?? '');
+    assert(gameId && /^\d{6}$/.test(joinCode), 'Three-player game creation failed.');
+
+    for (const label of ['Drei-A', 'Drei-B', 'Drei-C']) {
+      const client = makeClient();
+      await authenticate(client, label);
+      await rpc(client, 'meta_join_game', {
+        raw_join_code: joinCode,
+        requested_name: `${label}-${stamp.slice(-4)}`,
+        player_pin: '1357',
+        requested_avatar_path: null,
+      });
+      playerClients.push(client);
+    }
+
+    await expectRpcFailure(
+      host,
+      'meta_host_configure_round',
+      { target_game_id: gameId, round_package: packageFor(1) },
+      'mindestens 4 anwesende Teilnehmer',
+    );
+
+    const threePlayerPackage = packageFor(1);
+    threePlayerPackage.mission = {
+      ...threePlayerPackage.mission,
+      catalogId: 'M21',
+      title: 'Zweifaches Genau',
+    };
+    threePlayerPackage.challenge = {
+      ...threePlayerPackage.challenge,
+      catalogId: 'C21',
+      title: 'Präzisionsduell',
+    };
+    await rpc(host, 'meta_host_configure_round', {
+      target_game_id: gameId,
+      round_package: threePlayerPackage,
+    });
+    await rpc(host, 'meta_host_draw_millionaire', { target_game_id: gameId, force_redraw: false });
+    await rpc(host, 'meta_host_release_roles', { target_game_id: gameId });
+    await rpc(host, 'meta_host_publish_mission', { target_game_id: gameId });
+    await rpc(host, 'meta_host_draw_teams', { target_game_id: gameId });
+
+    const view = await hostView(host, gameId);
+    assert(view.currentRoundState.mission.catalogId === 'M21', 'Three-player mission was not stored.');
+    assert(view.currentRoundState.challenge.catalogId === 'C21', 'Three-player challenge was not stored.');
+    assert(Object.keys(view.currentRoundState.teams ?? {}).length === 3, 'Three-player teams were not published for all participants.');
+    console.log(JSON.stringify({ status: 'three-player-success', gameId, players: 3, mission: 'M21', challenge: 'C21' }));
+  } finally {
+    if (gameId) {
+      try {
+        await rpc(host, 'meta_delete_own_game', { target_game_id: gameId });
+      } catch (error) {
+        console.error(`Three-player cleanup failed: ${error.message}`);
+      }
+    }
+  }
+}
+
+run()
+  .then(verifyThreePlayerCatalog)
+  .catch((error) => {
+    console.error(error.stack || error.message || String(error));
+    process.exit(1);
+  });

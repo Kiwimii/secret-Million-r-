@@ -429,8 +429,8 @@ function HostDashboard({ view, controller }: { view: MetaGameView; controller: R
 
   const submitted = activeCandidates.filter((member) => member.voteSubmitted).length;
   const isBusy = Boolean(busyAction);
-  const nextStep = availableCount < 4
-    ? `Mindestens vier anwesende Teilnehmer werden benötigt. Aktuell: ${availableCount}.`
+  const nextStep = availableCount < 3
+    ? `Mindestens drei anwesende Teilnehmer werden benötigt. Aktuell: ${availableCount}.`
     : !round.mission?.catalogId || !round.challenge?.catalogId
       ? "Rundenpaket auswählen und versiegeln."
       : !round.millionaireId
